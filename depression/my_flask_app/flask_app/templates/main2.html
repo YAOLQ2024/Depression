@@ -1,0 +1,574 @@
+{% extends "base.html" %}
+
+{% block title %}工作台 - SDS 抑郁自评与辅助分析系统{% endblock %}
+
+{% block breadcrumb %}
+<span class="font-medium text-textPrimary">仪表盘</span>
+{% endblock %}
+
+{% block content %}
+<style>
+    .glass-panel {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.85) 100%);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.1);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .pattern-dots {
+        background-image: radial-gradient(#94A3B8 1px, transparent 1px);
+        background-size: 20px 20px;
+        opacity: 0.1;
+        position: absolute; inset: 0; pointer-events: none; z-index: 0;
+    }
+
+    .card-watermark {
+        position: absolute; bottom: -20px; right: -20px; opacity: 0.05;
+        transform: rotate(-15deg); pointer-events: none; z-index: 0;
+        transition: transform 0.5s ease;
+    }
+    .group:hover .card-watermark {
+        transform: rotate(0deg) scale(1.1);
+        opacity: 0.08;
+    }
+
+    .inner-bubble {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        filter: blur(3px);
+    }
+
+    /* 增强的漂浮动画 - 幅度三倍、原始速度 */
+    @keyframes float-enhanced {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(300px, -540px); }
+    }
+    @keyframes float-enhanced-reverse {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(-300px, 540px); }
+    }
+    @keyframes float-enhanced-2 {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(400px, -450px); }
+    }
+    @keyframes float-enhanced-3 {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(-350px, 500px); }
+    }
+    
+    .animate-float-enhanced { animation: float-enhanced 8s ease-in-out infinite; }
+    .animate-float-enhanced-reverse { animation: float-enhanced-reverse 10s ease-in-out infinite; }
+    .animate-float-enhanced-2 { animation: float-enhanced-2 9s ease-in-out infinite; }
+    .animate-float-enhanced-3 { animation: float-enhanced-3 11s ease-in-out infinite; }
+    .animate-float-fast { animation: float-enhanced 12s ease-in-out infinite; }
+    .animate-float-fast-reverse { animation: float-enhanced-reverse 10s ease-in-out infinite; }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+</style>
+
+<div class="relative m-0">
+    <!-- Main Content Layout -->
+    <main class="relative z-10 w-full p-[30px] min-h-screen">
+        
+        <!-- Welcome Banner -->
+        <section class="glass-panel rounded-[32px] p-8 md:p-12 mb-8 group shadow-card border-white/60 w-full relative overflow-hidden">
+            <div class="pattern-dots"></div>
+            <!-- 卡片内氛围泡泡 (15个) -->
+            <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                <!-- 大型泡泡 -->
+                <div class="inner-bubble w-80 h-80 -top-20 -right-20 bg-orange-200/50 animate-float-enhanced blur-none"></div>
+                <div class="inner-bubble w-72 h-72 -bottom-10 -left-10 bg-blue-200/45 animate-float-enhanced-reverse blur-none"></div>
+                <div class="inner-bubble w-64 h-64 top-1/4 right-1/4 bg-pink-200/40 animate-float-enhanced-2 blur-sm opacity-80"></div>
+                <div class="inner-bubble w-60 h-60 top-0 left-1/3 bg-purple-100/50 animate-float-fast blur-md"></div>
+                
+                <!-- 中型泡泡 -->
+                <div class="inner-bubble w-48 h-48 top-20 right-10 bg-indigo-100/45 animate-float-enhanced blur-lg"></div>
+                <div class="inner-bubble w-44 h-44 bottom-1/4 left-1/4 bg-cyan-100/50 animate-float-enhanced-reverse blur-none"></div>
+                <div class="inner-bubble w-40 h-40 top-1/2 right-1/3 bg-amber-100/40 animate-float-fast blur-md"></div>
+                <div class="inner-bubble w-36 h-36 bottom-1/3 right-1/2 bg-lime-100/45 animate-float-enhanced-2 blur-sm"></div>
+                <div class="inner-bubble w-44 h-44 -top-5 left-1/4 bg-fuchsia-100/50 animate-float-enhanced-3 blur-lg"></div>
+                
+                <!-- 小型泡泡 -->
+                <div class="inner-bubble w-32 h-32 top-10 left-20 bg-emerald-100/50 animate-float blur-none"></div>
+                <div class="inner-bubble w-28 h-28 bottom-1/2 right-20 bg-orange-100/45 animate-float-enhanced-reverse blur-md"></div>
+                <div class="inner-bubble w-24 h-24 top-3/4 left-1/3 bg-blue-100/40 animate-float-enhanced-2 blur-none opacity-70"></div>
+                <div class="inner-bubble w-24 h-24 top-1/3 left-10 bg-rose-100/45 animate-float-enhanced blur-lg opacity-80"></div>
+                <div class="inner-bubble w-20 h-20 bottom-1/4 right-1/3 bg-indigo-100/50 animate-float-enhanced-reverse blur-sm"></div>
+                <div class="inner-bubble w-16 h-16 top-20 left-1/2 bg-amber-100/50 animate-float-fast blur-none opacity-60"></div>
+            </div>
+
+            <!-- 中间装饰线条 -->
+            <div class="absolute top-1/2 left-1/4 w-1/2 h-32 -translate-y-1/2 bg-gradient-to-r from-transparent via-blue-50/30 to-transparent blur-2xl transform rotate-12 pointer-events-none"></div>
+
+            <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                <div class="flex flex-col items-start gap-6 max-w-2xl">
+                    <div>
+                        <div class="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full bg-white/60 border border-orange-100 backdrop-blur-sm shadow-sm">
+                            <span class="flex h-2 w-2 rounded-full bg-orange-400 animate-pulse"></span>
+                            <span class="text-xs font-semibold text-orange-600 tracking-wide">早安，愿你今天心情晴朗</span>
+                        </div>
+                        <h1 class="text-4xl md:text-5xl font-bold text-slate-800 tracking-tight leading-[1.15] mb-4">
+                            探索内心，<br/>
+                            <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">重获平静的力量。</span>
+                        </h1>
+                        <p class="text-slate-500 text-lg leading-relaxed max-w-lg">
+                            您的上一次测评是在 <span class="font-medium text-slate-700">-- 天前</span>。定期的情绪体检有助于更好地了解自己。
+                        </p>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-4">
+                        <a href="{{ url_for('test.SDS') }}" class="flex items-center gap-2 px-8 py-3.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 group/btn active:scale-95">
+                            <span class="font-semibold text-[15px]">开始新测评</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                        </a>
+                        <a href="{{ url_for('main.history') }}" class="px-8 py-3.5 bg-white/80 text-slate-600 border border-slate-200 rounded-xl hover:bg-white hover:text-slate-900 transition-all font-semibold text-[15px] active:scale-95 shadow-sm">
+                            查看历史记录
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 今日心语 -->
+                <div class="hidden md:flex flex-col items-start p-5 rounded-2xl bg-white/40 border border-white/60 backdrop-blur-md shadow-sm max-w-xs transform rotate-2 hover:rotate-0 transition-transform duration-500 cursor-default relative overflow-hidden">
+                    <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                        <div class="inner-bubble w-40 h-40 -bottom-10 -right-10 bg-yellow-200/50 animate-float-enhanced blur-none"></div>
+                        <div class="inner-bubble w-36 h-36 -top-8 -left-8 bg-orange-100/45 animate-float blur-sm"></div>
+                        <div class="inner-bubble w-28 h-28 top-1/4 right-5 bg-amber-100/40 animate-float-enhanced-reverse blur-md"></div>
+                        <div class="inner-bubble w-20 h-20 top-1/2 left-10 bg-orange-100/45 animate-float-fast-reverse blur-lg"></div>
+                        <div class="inner-bubble w-16 h-16 top-10 right-1/4 bg-yellow-100/50 animate-float-enhanced blur-none opacity-80"></div>
+                    </div>
+                    <svg class="w-6 h-6 text-blue-400 mb-2 relative z-10" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21L14.017 18C14.017 16.8954 13.1216 16 12.0171 16H6.01709V14H5.01709V8H14.0171V6H4.01709V14.4142L6.01709 16.4142V21H14.017ZM21.0171 21V18C21.0171 16.8954 20.1216 16 19.0171 16H15.0171V8H20.0171V6H13.0171V16H19.0171V21H21.0171Z"/></svg>
+                    <p class="text-sm font-medium text-slate-700 leading-relaxed italic relative z-10">
+                        "真正的平静，不是避开这里的喧嚣，而是心中修篱种菊。"
+                    </p>
+                    <div class="mt-3 flex items-center gap-2 relative z-10">
+                        <div class="h-px w-8 bg-slate-300"></div>
+                        <span class="text-xs text-slate-400">每日心语</span>
+                    </div>
+                </div>
+
+                <!-- 艺术插画 -->
+                <div class="relative w-48 h-48 lg:w-64 lg:h-64 opacity-90 hidden md:block group-hover:scale-105 transition-transform duration-700">
+                    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-xl">
+                        <path fill="#F59E0B" d="M44.7,-76.4C58.9,-69.2,71.8,-59.1,81.6,-46.6C91.4,-34.1,98.2,-19.2,95.8,-5.2C93.5,8.9,82,22.1,70.9,33.1C59.8,44.1,49.1,52.9,37.6,58.8C26.1,64.7,13.8,67.7,0.8,66.3C-12.2,64.9,-25.6,59.1,-37.9,51.8C-50.2,44.5,-61.4,35.7,-69.3,24.4C-77.2,13.1,-81.8,-0.7,-78.4,-13.2C-75,-25.7,-63.6,-36.9,-51.7,-44.6C-39.8,-52.3,-27.4,-56.5,-15.3,-60.9C-3.2,-65.3,8.6,-69.9,20.8,-74.3" transform="translate(100 100)"/>
+                    </svg>
+                </div>
+            </div>
+        </section>
+
+        <!-- Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 w-full">
+            
+            <!-- 左侧主列 (Col-8) -->
+            <div class="lg:col-span-8 flex flex-col gap-6 lg:gap-8">
+                
+                <!-- 1. 情绪趋势卡片 -->
+                <div class="glass-panel rounded-[24px] p-8 shadow-card relative w-full h-full flex flex-col overflow-hidden group">
+                    <div class="pattern-dots"></div>
+                    <!-- 卡片内氛围泡泡 (10个) -->
+                    <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                        <div class="inner-bubble w-56 h-56 -top-10 -right-10 bg-blue-200/50 animate-float-enhanced blur-none"></div>
+                        <div class="inner-bubble w-48 h-48 -bottom-5 -left-5 bg-indigo-200/45 animate-float blur-sm"></div>
+                        <div class="inner-bubble w-44 h-44 top-1/4 right-1/4 bg-cyan-100/40 animate-float-enhanced-reverse blur-md"></div>
+                        <div class="inner-bubble w-40 h-40 bottom-1/3 left-1/3 bg-blue-100/50 animate-float-enhanced-2 blur-none opacity-75"></div>
+                        <div class="inner-bubble w-36 h-36 top-1/2 right-10 bg-indigo-100/45 animate-float-fast-reverse blur-lg"></div>
+                        <div class="inner-bubble w-28 h-28 top-10 left-1/4 bg-cyan-100/50 animate-float-enhanced blur-md opacity-80"></div>
+                        <div class="inner-bubble w-24 h-24 bottom-1/4 right-1/3 bg-blue-100/45 animate-float blur-none"></div>
+                        <div class="inner-bubble w-20 h-20 top-1/3 right-1/2 bg-indigo-100/40 animate-float-enhanced-reverse blur-lg"></div>
+                        <div class="inner-bubble w-18 h-18 bottom-10 left-1/2 bg-sky-100/50 animate-float-enhanced-2 blur-sm"></div>
+                        <div class="inner-bubble w-16 h-16 top-1/4 left-5 bg-indigo-100/50 animate-float-enhanced blur-md"></div>
+                    </div>
+                    
+                    <svg class="card-watermark w-64 h-64 text-blue-50" fill="currentColor" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+
+                    <div class="flex justify-between items-center mb-6 relative z-10">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-800 tracking-tight">情绪变化趋势</h2>
+                            <p class="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">Trend Analysis</p>
+                        </div>
+                        <div class="flex bg-slate-50/80 p-1 rounded-lg border border-slate-100">
+                            <button class="px-3 py-1 text-xs font-semibold rounded-md bg-white text-slate-800 shadow-sm border border-slate-100 transition-all">周</button>
+                            <button class="px-3 py-1 text-xs font-semibold rounded-md text-slate-500 hover:text-slate-700 transition-all">月</button>
+                        </div>
+                    </div>
+
+                    <!-- Key Metrics -->
+                    <div class="grid grid-cols-3 gap-4 mb-6 relative z-10">
+                        <div class="p-4 bg-white/60 rounded-2xl border border-white/50 shadow-sm backdrop-blur-sm transition-all hover:bg-white/80 group/metric">
+                            <p class="text-xs font-semibold text-slate-400 mb-1">平均指数</p>
+                            <p class="text-2xl font-bold text-slate-700 group-hover/metric:text-blue-600 transition-colors" id="avgScore">N/A</p>
+                        </div>
+                        <div class="p-4 bg-white/60 rounded-2xl border border-white/50 shadow-sm backdrop-blur-sm transition-all hover:bg-white/80 group/metric">
+                            <p class="text-xs font-semibold text-slate-400 mb-1">最高记录</p>
+                            <p class="text-2xl font-bold text-slate-700 group-hover/metric:text-rose-500 transition-colors" id="maxScore">--</p>
+                        </div>
+                        <div class="p-4 bg-white/60 rounded-2xl border border-white/50 shadow-sm backdrop-blur-sm transition-all hover:bg-white/80 group/metric">
+                            <p class="text-xs font-semibold text-slate-400 mb-1">波动情况</p>
+                            <div class="flex items-center text-emerald-500 font-bold text-lg">
+                                <span id="variance">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 图表容器 -->
+                    <div class="relative w-full flex-grow min-h-[250px] z-10">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+
+                    <!-- 底部 AI 洞察 -->
+                    <div class="mt-4 pt-4 border-t border-slate-100 relative z-10">
+                        <p class="text-sm text-slate-500 flex items-center gap-2 bg-blue-50/50 px-3 py-2 rounded-lg border border-blue-100/50">
+                            <span class="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
+                            <span class="font-medium text-slate-600">AI 分析：</span>
+                            情绪波动较大，请注意情绪调节。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 2. 快捷功能区 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <!-- Card A -->
+                    <a href="{{ url_for('main.history') }}" class="glass-panel rounded-[24px] p-6 hover:shadow-card-hover transition-all cursor-pointer group border-white/60 hover:border-blue-200 relative w-full overflow-hidden">
+                        <div class="pattern-dots opacity-10"></div>
+                        <!-- 内部悬浮球 (6个) -->
+                        <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                            <div class="inner-bubble w-32 h-32 -top-8 -right-8 bg-teal-200/50 animate-float-enhanced blur-none"></div>
+                            <div class="inner-bubble w-28 h-28 -bottom-6 -left-6 bg-emerald-100/45 animate-float blur-sm"></div>
+                            <div class="inner-bubble w-24 h-24 top-1/4 right-5 bg-teal-100/40 animate-float-enhanced-reverse blur-md"></div>
+                            <div class="inner-bubble w-20 h-20 bottom-1/3 left-1/4 bg-cyan-100/50 animate-float-enhanced-2 blur-lg"></div>
+                            <div class="inner-bubble w-18 h-18 top-1/2 left-5 bg-emerald-100/45 animate-float-fast-reverse blur-none opacity-75"></div>
+                            <div class="inner-bubble w-14 h-14 top-5 right-1/4 bg-cyan-100/50 animate-float-enhanced blur-md opacity-70"></div>
+                        </div>
+                        
+                        <div class="flex justify-between items-start mb-4 relative z-10">
+                            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-50 to-teal-100 text-teal-600 flex items-center justify-center shadow-sm border border-teal-50 group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            </div>
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-slate-100 text-slate-300 group-hover:text-teal-500 group-hover:border-teal-200 transition-all shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800 mb-1 relative z-10">历史报告</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed relative z-10">回顾所有的测评记录与专业建议，追踪心理健康历程。</p>
+                    </a>
+                    <!-- Card B -->
+                    <a href="#" class="glass-panel rounded-[24px] p-6 hover:shadow-card-hover transition-all cursor-pointer group border-white/60 hover:border-rose-200 relative w-full overflow-hidden">
+                        <div class="pattern-dots opacity-10"></div>
+                        <!-- 内部悬浮球 (6个) -->
+                        <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                            <div class="inner-bubble w-32 h-32 -bottom-8 -left-8 bg-rose-200/50 animate-float-enhanced-reverse blur-none"></div>
+                            <div class="inner-bubble w-28 h-28 -top-6 -right-6 bg-pink-100/45 animate-float blur-sm"></div>
+                            <div class="inner-bubble w-24 h-24 bottom-1/4 left-5 bg-rose-100/40 animate-float-enhanced blur-md"></div>
+                            <div class="inner-bubble w-20 h-20 top-1/3 right-1/4 bg-fuchsia-100/50 animate-float-enhanced-2 blur-lg"></div>
+                            <div class="inner-bubble w-18 h-18 bottom-1/2 right-5 bg-pink-100/45 animate-float-fast-reverse blur-none opacity-75"></div>
+                            <div class="inner-bubble w-14 h-14 bottom-5 right-1/4 bg-fuchsia-100/50 animate-float-enhanced blur-md opacity-70"></div>
+                        </div>
+
+                        <div class="flex justify-between items-start mb-4 relative z-10">
+                            <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-50 to-rose-100 text-rose-500 flex items-center justify-center shadow-sm border border-rose-50 group-hover:scale-110 transition-transform duration-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                            </div>
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center bg-white border border-slate-100 text-slate-300 group-hover:text-rose-500 group-hover:border-rose-200 transition-all shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </div>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-800 mb-1 relative z-10">心理科普</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed relative z-10">阅读最新的心理健康知识文章，学习情绪调节技巧。</p>
+                    </a>
+                </div>
+
+            </div>
+
+            <!-- 右侧边栏 (Col-4) -->
+            <div class="lg:col-span-4 flex flex-col gap-6 lg:gap-8">
+                
+                <!-- 当前状态 -->
+                <div class="glass-panel rounded-[24px] p-6 relative overflow-hidden group w-full">
+                    <div class="pattern-dots"></div>
+                    <!-- 卡片内氛围泡泡 (8个) -->
+                    <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                        <div class="inner-bubble w-40 h-40 -top-10 -right-10 bg-green-200/50 animate-float-enhanced blur-none"></div>
+                        <div class="inner-bubble w-36 h-36 -bottom-8 -left-8 bg-emerald-100/45 animate-float blur-sm"></div>
+                        <div class="inner-bubble w-32 h-32 top-1/4 right-5 bg-lime-100/40 animate-float-enhanced-reverse blur-md"></div>
+                        <div class="inner-bubble w-28 h-28 bottom-1/3 left-1/4 bg-green-100/50 animate-float-enhanced-2 blur-lg"></div>
+                        <div class="inner-bubble w-24 h-24 top-1/2 left-5 bg-teal-100/45 animate-float-fast-reverse blur-none opacity-75"></div>
+                        <div class="inner-bubble w-20 h-20 bottom-10 right-1/3 bg-emerald-100/40 animate-float-enhanced-3 blur-sm"></div>
+                        <div class="inner-bubble w-18 h-18 top-5 right-1/4 bg-lime-100/50 animate-float-enhanced blur-md opacity-70"></div>
+                        <div class="inner-bubble w-16 h-16 bottom-5 left-1/2 bg-green-100/45 animate-float blur-lg"></div>
+                    </div>
+
+                    <!-- 顶部标题区 -->
+                    <div class="flex items-center justify-between mb-2 relative z-10">
+                        <h3 class="font-bold text-slate-800">当前状态</h3>
+                        {% if latest_comprehensive_score is not none %}
+                            {% if latest_comprehensive_score < 40 %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-green-50 border border-green-100 text-green-600 text-xs font-bold shadow-sm">
+                                    良好
+                                </span>
+                            {% elif latest_comprehensive_score < 50 %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-yellow-50 border border-yellow-100 text-yellow-600 text-xs font-bold shadow-sm">
+                                    轻度
+                                </span>
+                            {% elif latest_comprehensive_score < 60 %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-xs font-bold shadow-sm">
+                                    中度
+                                </span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-red-50 border border-red-100 text-red-600 text-xs font-bold shadow-sm">
+                                    重度
+                                </span>
+                            {% endif %}
+                        {% else %}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-gray-50 border border-gray-100 text-gray-600 text-xs font-bold shadow-sm">
+                                暂无
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center gap-1.5 mb-6 relative z-10">
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span class="text-xs text-slate-400">上次检测：{% if latest_finish_time %}{{ latest_finish_time }}{% else %}--{% endif %}</span>
+                        <div class="h-px flex-grow bg-slate-100 ml-2"></div>
+                    </div>
+                    
+                    <!-- 仪表盘 -->
+                    <div class="relative w-40 h-40 mx-auto mb-4 z-10">
+                        <svg class="w-full h-full transform -rotate-90">
+                            <circle cx="80" cy="80" r="70" stroke="#F1F5F9" stroke-width="12" fill="none" />
+                            {% if latest_comprehensive_score is not none %}
+                                {% set percentage = (latest_comprehensive_score / 80 * 100) | round %}
+                                {% set offset = 440 - (440 * percentage / 100) %}
+                                {% if latest_comprehensive_score < 40 %}
+                                    {% set stroke_color = "#10B981" %}
+                                {% elif latest_comprehensive_score < 50 %}
+                                    {% set stroke_color = "#F59E0B" %}
+                                {% elif latest_comprehensive_score < 60 %}
+                                    {% set stroke_color = "#F97316" %}
+                                {% else %}
+                                    {% set stroke_color = "#EF4444" %}
+                                {% endif %}
+                                <circle cx="80" cy="80" r="70" stroke="{{ stroke_color }}" stroke-width="12" fill="none" stroke-dasharray="440" stroke-dashoffset="{{ offset }}" stroke-linecap="round" id="scoreCircle" />
+                            {% else %}
+                                <circle cx="80" cy="80" r="70" stroke="#94A3B8" stroke-width="12" fill="none" stroke-dasharray="440" stroke-dashoffset="440" stroke-linecap="round" />
+                            {% endif %}
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            {% if latest_comprehensive_score is not none %}
+                                {% if latest_comprehensive_score < 40 %}
+                                    <span class="text-4xl font-bold text-green-600">{{ latest_comprehensive_score }}</span>
+                                {% elif latest_comprehensive_score < 50 %}
+                                    <span class="text-4xl font-bold text-yellow-600">{{ latest_comprehensive_score }}</span>
+                                {% elif latest_comprehensive_score < 60 %}
+                                    <span class="text-4xl font-bold text-orange-600">{{ latest_comprehensive_score }}</span>
+                                {% else %}
+                                    <span class="text-4xl font-bold text-red-600">{{ latest_comprehensive_score }}</span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-4xl font-bold text-slate-400">--</span>
+                            {% endif %}
+                            <span class="text-xs text-slate-400 uppercase tracking-wide mt-1">综合评分</span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center relative z-10">
+                        {% if latest_comprehensive_score is not none %}
+                            <p class="text-sm text-slate-500">最新测评综合评分<br>基于SDS、表情和脑电数据</p>
+                        {% else %}
+                            <p class="text-sm text-slate-500">暂无测评数据。<br>请完成首次测评。</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 每日推荐 -->
+                <div class="glass-panel rounded-[24px] p-6 relative overflow-hidden w-full flex-grow flex flex-col">
+                    <div class="pattern-dots opacity-10"></div>
+                    <!-- 卡片内氛围泡泡 (8个) -->
+                    <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                        <div class="inner-bubble w-40 h-40 -top-8 -right-8 bg-orange-200/50 animate-float-enhanced blur-none"></div>
+                        <div class="inner-bubble w-36 h-36 -bottom-6 -left-6 bg-rose-100/45 animate-float blur-sm"></div>
+                        <div class="inner-bubble w-32 h-32 top-1/4 right-5 bg-amber-100/40 animate-float-enhanced-reverse blur-md"></div>
+                        <div class="inner-bubble w-28 h-28 bottom-1/3 left-1/4 bg-orange-100/50 animate-float-enhanced-2 blur-lg"></div>
+                        <div class="inner-bubble w-24 h-24 top-1/2 left-5 bg-red-100/45 animate-float-fast-reverse blur-none opacity-75"></div>
+                        <div class="inner-bubble w-20 h-20 bottom-10 right-1/3 bg-rose-100/40 animate-float-enhanced-3 blur-sm"></div>
+                        <div class="inner-bubble w-18 h-18 top-5 right-1/4 bg-amber-100/50 animate-float-enhanced blur-md opacity-70"></div>
+                        <div class="inner-bubble w-16 h-16 bottom-5 left-1/2 bg-orange-100/45 animate-float blur-lg"></div>
+                    </div>
+
+                    <h3 class="font-bold text-slate-800 mb-5 flex items-center gap-2 relative z-10">
+                        <span>每日治愈</span>
+                        <span class="h-px flex-grow bg-slate-100"></span>
+                    </h3>
+                    <div class="space-y-5 relative z-10 flex-grow">
+                        <!-- Item 1 -->
+                        <a href="#" class="flex gap-4 group">
+                            <div class="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0 relative shadow-sm border border-white">
+                                <div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style="background-image: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80');"></div>
+                                <div class="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[1px]">
+                                    <div class="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center shadow-sm">
+                                        <svg class="w-4 h-4 text-slate-800 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex flex-col justify-center">
+                                <span class="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Audio</span>
+                                <h4 class="text-sm font-bold text-slate-700 leading-snug group-hover:text-blue-600 transition-colors">雨声与森林：15分钟白噪音冥想</h4>
+                            </div>
+                        </a>
+                        
+                        <!-- Item 2 -->
+                        <a href="#" class="flex gap-4 group">
+                            <div class="w-20 h-20 rounded-2xl bg-slate-100 overflow-hidden shrink-0 shadow-sm border border-white">
+                                <div class="w-full h-full bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style="background-image: url('https://images.unsplash.com/photo-1544367563-12123d8965cd?ixlib=rb-1.2.1&auto=format&fit=crop&w=200&q=80');"></div>
+                            </div>
+                            <div class="flex flex-col justify-center">
+                                <span class="text-[10px] font-bold text-rose-500 uppercase tracking-wider mb-1">Article</span>
+                                <h4 class="text-sm font-bold text-slate-700 leading-snug group-hover:text-blue-600 transition-colors">如何接纳不完美的自己？</h4>
+                            </div>
+                        </a>
+
+                        <!-- 每日小贴士 -->
+                        <div class="mt-4 p-3 bg-orange-50/50 rounded-xl border border-orange-100 flex gap-3 items-start relative z-10 backdrop-blur-sm">
+                            <div class="mt-0.5 p-1 bg-orange-100 rounded-full text-orange-500">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
+                            <div>
+                                <p class="text-xs font-bold text-orange-800 mb-0.5">今日小贴士</p>
+                                <p class="text-xs text-orange-700/80 leading-relaxed">睡前一小时远离电子屏幕，可以显著提升睡眠质量。</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button class="w-full mt-6 py-2.5 rounded-xl border border-slate-200 bg-white/50 text-xs font-bold text-slate-500 hover:bg-white hover:text-slate-700 transition-all shadow-sm relative z-10">
+                        查看更多推荐
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Chart Config
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('trendChart');
+        if (ctx) {
+            const chartCtx = ctx.getContext('2d');
+            const gradient = chartCtx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(59, 130, 246, 0.12)'); 
+            gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+            // 从服务器获取实际数据
+            const sortedList = {{ sorted_list | tojson if sorted_list else '[]' }};
+            
+            let labels = [];
+            let data = [];
+            
+            if (sortedList && sortedList.length > 0) {
+                // 取最近10条记录，按时间正序排列（用于图表显示）
+                const recentRecords = sortedList.slice(0, 10).reverse();
+                labels = recentRecords.map(r => {
+                    const time = r.finish_time || r.time || '';
+                    // 提取日期部分 (MM-DD)
+                    const match = time.match(/(\d{2})-(\d{2})/);
+                    if (match) {
+                        return `${match[1]}-${match[2]}`;
+                    }
+                    // 如果没有匹配到，尝试其他格式
+                    const dateMatch = time.match(/(\d{4})-(\d{2})-(\d{2})/);
+                    if (dateMatch) {
+                        return `${dateMatch[2]}-${dateMatch[3]}`;
+                    }
+                    return time.substring(0, 5); // 取前5个字符作为备用
+                });
+                data = recentRecords.map(r => r.score || 0);
+                
+                // 更新统计信息
+                const scores = recentRecords.map(r => r.score || 0).filter(s => s > 0);
+                if (scores.length > 0) {
+                    // 平均指数
+                    const avgScore = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+                    document.getElementById('avgScore').textContent = avgScore;
+                    
+                    // 最高记录
+                    const maxScore = Math.max(...scores);
+                    document.getElementById('maxScore').textContent = maxScore;
+                    
+                    // 波动情况
+                    if (scores.length > 1) {
+                        const minScore = Math.min(...scores);
+                        const variance = maxScore - minScore;
+                        document.getElementById('variance').textContent = `±${variance}`;
+                    } else {
+                        document.getElementById('variance').textContent = '--';
+                    }
+                }
+            } else {
+                // 占位数据
+                labels = ['暂无数据'];
+                data = [0];
+            }
+
+            const trendChart = new Chart(chartCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'SDS 指数',
+                        data: data,
+                        borderColor: data.length > 0 && data[0] !== 0 ? '#3B82F6' : '#94A3B8',
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        pointBackgroundColor: '#FFFFFF',
+                        pointBorderColor: data.length > 0 && data[0] !== 0 ? '#3B82F6' : '#94A3B8',
+                        pointBorderWidth: 3,
+                        pointRadius: 5,
+                        pointHoverRadius: 7,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            titleColor: '#1E293B',
+                            bodyColor: '#475569',
+                            borderColor: '#E2E8F0',
+                            borderWidth: 1,
+                            padding: 12,
+                            boxPadding: 4,
+                            cornerRadius: 12,
+                            displayColors: false,
+                            titleFont: { family: "'Inter', sans-serif", size: 13 },
+                            bodyFont: { family: "'Inter', sans-serif", size: 13 },
+                            callbacks: { label: (c) => c.parsed.y ? 'SDS 指数: ' + c.parsed.y : '暂无数据' }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94A3B8', font: { size: 11 } } },
+                        y: { 
+                            border: { display: false }, 
+                            grid: { color: '#F1F5F9', borderDash: [4, 4] }, 
+                            ticks: { color: '#94A3B8', padding: 10 }, 
+                            min: data.length > 0 && Math.min(...data.filter(d => d > 0)) > 0 ? Math.max(20, Math.min(...data.filter(d => d > 0)) - 10) : 20, 
+                            max: data.length > 0 && Math.max(...data) > 0 ? Math.min(80, Math.max(...data) + 10) : 80 
+                        }
+                    },
+                    layout: { padding: { top: 10, bottom: 0, left: 0, right: 0 } }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

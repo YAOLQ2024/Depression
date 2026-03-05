@@ -1,0 +1,116 @@
+# NVIDIA GPU环境依赖配置 - Python 3.9+兼容版本
+# 抑郁症评估系统 - GPU加速版本
+
+# 基础Web框架
+Flask>=2.2.5
+Werkzeug>=2.2.3
+Jinja2>=3.1.2
+click>=8.1.3
+itsdangerous>=2.1.2
+MarkupSafe>=2.1.3
+blinker>=1.6.0
+
+# 科学计算库
+# 注意：numpy版本受dataoceanai-dolphin/espnet限制，需要<1.24
+# numpy>=1.24.3  # 注释掉，因为espnet要求numpy<1.24
+numpy>=1.23.0,<1.24  # 兼容espnet和opencv-python
+scipy>=1.10.1
+
+# 音频处理库
+librosa>=0.9.2
+soundfile>=0.12.1
+resampy>=0.4.2
+numba>=0.56.4
+llvmlite>=0.39.1
+pyaudio>=0.2.11  # 用于实时音频输入
+
+# Dolphin ASR - 中文语音识别引擎
+dataoceanai-dolphin>=1.0.0  # Dolphin中文语音识别库
+
+# PyTorch with CUDA支持 (NVIDIA GPU版本)
+# 请根据您的CUDA版本选择合适的PyTorch版本
+# 示例：CUDA 11.8
+# torch>=2.0.0
+# torchaudio>=2.0.0
+# 或通过以下命令安装：
+# pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# ONNX Runtime with GPU支持 (替代华为ais_bench)
+onnxruntime-gpu>=1.16.0
+
+# 音频格式支持
+ffmpeg-python>=0.2.0
+pydub>=0.25.1
+
+# 机器学习框架
+scikit-learn>=1.2.2
+joblib>=1.2.0
+
+# 数据处理
+pandas>=1.5.3
+
+# 图像和信号处理
+# 注意：兼容numpy 1.23.x的opencv-python版本（opencv-python 4.11.x及以下）
+opencv-python>=4.7.0,<4.12.0  # 限制在4.12之前以兼容numpy 1.23.x
+Pillow>=9.5.0
+
+# 系统监控和工具
+psutil>=5.9.4
+requests>=2.28.2
+urllib3>=1.26.15
+
+# 日志和配置
+pyyaml>=6.0
+configparser>=5.3.0
+python-dotenv>=1.0.0
+
+# 开发和调试工具
+tqdm>=4.64.1
+
+# Web服务器
+gunicorn>=20.1.0
+eventlet>=0.33.3
+
+# 安全和认证
+cryptography>=40.0.2
+bcrypt>=4.0.1
+
+# API和文档
+flask-restx>=1.1.0
+flask-cors>=4.0.0
+
+# 文本处理和NLP
+jieba>=0.42.1
+pypinyin>=0.48.0
+
+# 文件和数据格式
+openpyxl>=3.1.1
+h5py>=3.8.0
+jsonschema>=4.17.3
+
+# 系统集成
+schedule>=1.2.0
+watchdog>=3.0.0
+
+# 测试相关的依赖
+decorator>=5.1.1
+attrs>=22.2.0
+cloudpickle>=2.2.1
+tornado>=6.2
+absl-py>=1.4.0
+
+# 额外的必需依赖
+packaging>=23.0
+certifi>=2022.12.7
+charset-normalizer>=3.0.0
+idna>=3.4
+platformdirs>=3.0.0
+
+# 表情识别相关依赖
+easydict>=1.10
+py-cpuinfo>=9.0.0
+
+# CUDA相关（可选，用于GPU加速）
+# nvidia-cuda-runtime-cu11>=11.7.0  # 如果需要的话

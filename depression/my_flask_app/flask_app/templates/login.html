@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - SDS 多模态评估系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2F6FED',
+                        'primary-hover': '#2B63D4',
+                        'primary-tint': '#EAF1FF',
+                        secondary: '#1FA89B',
+                        'secondary-tint': '#E7F7F4',
+                        surface: '#FFFFFF',
+                        background: '#F6F7F4',
+                        text: {
+                            primary: '#1F2937',
+                            secondary: '#4B5563',
+                            tertiary: '#6B7280',
+                        },
+                        danger: '#D95757',
+                        'danger-tint': '#FDECEC',
+                        border: '#E5E7EB',
+                    },
+                    fontFamily: {
+                        sans: ['"Noto Sans SC"', 'system-ui', '-apple-system', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'soft': '0 4px 24px -4px rgba(0, 0, 0, 0.04)', /* 减弱阴影 */
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #F6F7F4;
+            /* 极淡 blob (radial) */
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(234, 241, 255, 0.6) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(231, 247, 244, 0.5) 0%, transparent 40%);
+            background-attachment: fixed;
+            overflow-x: hidden;
+        }
+
+        .input-focus-ring:focus {
+            outline: none;
+            border-color: #2F6FED;
+            box-shadow: 0 0 0 2px #EAF1FF; /* 外圈 2px Primary Tint */
+        }
+        
+        /* 隐藏复选框默认样式，使用自定义样式（如果需要更复杂的）或者直接利用 Tailwind accent-color / text-primary */
+        input[type="checkbox"] {
+            accent-color: #2F6FED;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-0">
+
+    <!-- 全局居中容器 -->
+    <div class="w-full max-w-[1280px] mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20 items-start py-12 lg:py-24">
+        
+        <!-- 左侧信息栏 (56% -> col-span-7) -->
+        <div class="lg:col-span-7 flex flex-col space-y-8 lg:space-y-10 lg:pt-2">
+            
+            <!-- A 品牌区 -->
+            <div class="space-y-4">
+                <div class="w-10 h-10 rounded-[12px] bg-primary flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                    SDS
+                </div>
+                <div>
+                    <h1 class="text-[28px] leading-[36px] font-semibold text-text-primary mb-2">
+                        SDS 抑郁自评与辅助分析系统
+                    </h1>
+                    <p class="text-[16px] leading-[26px] text-text-secondary">
+                        3–5 分钟完成自评，生成可解释的结果与建议。
+                    </p>
+                </div>
+            </div>
+
+            <!-- B 亮点区 (轻卡片) -->
+            <div class="bg-white/80 border border-border rounded-[14px] p-5 md:p-6 backdrop-blur-sm">
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-check-circle text-secondary text-[18px] mt-0.5"></i>
+                        <span class="text-[14px] leading-[22px] text-text-secondary">快速完成测评并查看报告，支持多维度分析</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-clock-rotate-left text-secondary text-[18px] mt-0.5"></i>
+                        <span class="text-[14px] leading-[22px] text-text-secondary">支持历史记录与趋势对比，追踪心理健康状态</span>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <i class="fa-solid fa-face-smile text-secondary text-[18px] mt-0.5"></i>
+                        <span class="text-[14px] leading-[22px] text-text-secondary">可选采集表情/语音/EEG，用于辅助分析（不影响问卷提交）</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- C 合规与链接 -->
+            <div class="space-y-4 pt-2">
+                <p class="text-[12px] leading-[18px] text-text-tertiary">
+                    自评与辅助分析仅供参考，不构成医疗诊断。
+                </p>
+                <div class="flex flex-wrap gap-3">
+                    <a href="#" class="inline-flex items-center px-2.5 py-1.5 rounded-full border border-border text-[12px] text-text-secondary bg-white/50 hover:bg-white hover:text-primary hover:border-primary transition-all duration-200">
+                        隐私说明
+                    </a>
+                    <a href="#" class="inline-flex items-center px-2.5 py-1.5 rounded-full border border-border text-[12px] text-text-secondary bg-white/50 hover:bg-white hover:text-primary hover:border-primary transition-all duration-200">
+                        数据采集说明（摄像头/麦克风/EEG）
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧登录卡 (44% -> col-span-5) -->
+        <div class="lg:col-span-5 w-full">
+            <div class="w-full max-w-[480px] bg-white rounded-[16px] border border-border shadow-soft p-8 mx-auto lg:ml-auto lg:mr-0">
+                
+                <!-- 卡片头部 -->
+                <div class="mb-6">
+                    <h2 class="text-[24px] leading-[32px] font-semibold text-text-primary mb-1">登录</h2>
+                    <p class="text-[14px] leading-[22px] text-text-secondary">使用账号登录以继续。</p>
+                </div>
+
+                <!-- 错误提示区 (Flash Messages) -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                  {% if messages %}
+                    <div class="mb-5 space-y-2">
+                    {% for category, message in messages %}
+                      <!-- 错误态：#FDECEC 背景 + #D95757 文案 -->
+                      <div class="p-3 rounded-[10px] text-sm font-medium flex items-start gap-2
+                        {% if category == 'error' %}bg-danger-tint text-danger{% else %}bg-primary-tint text-primary{% endif %}">
+                        <i class="fa-solid {% if category == 'error' %}fa-circle-exclamation{% else %}fa-circle-info{% endif %} mt-0.5 shrink-0"></i>
+                        <span class="leading-5">{{ message }}</span>
+                      </div>
+                    {% endfor %}
+                    </div>
+                  {% endif %}
+                {% endwith %}
+                
+                <!-- 预留 Alert 占位 (前端 JS 错误提示用，默认不显示) -->
+                <div id="js-error-alert" class="hidden mb-5 p-3 rounded-[10px] text-sm font-medium bg-danger-tint text-danger flex items-start gap-2">
+                     <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0"></i>
+                     <span class="leading-5" id="js-error-msg">账号或密码错误，请重试。</span>
+                </div>
+
+                <form action="{{ url_for('account.login') }}" method="POST" id="loginForm">
+                    <!-- 字段区 -->
+                    <div class="space-y-4">
+                        <!-- 账号 -->
+                        <div class="space-y-1.5">
+                            <label class="block text-[14px] leading-[22px] font-medium text-text-secondary">账号</label>
+                            <input type="text" name="account" required 
+                                class="block w-full h-[48px] px-4 bg-[#F9FAFB] border border-border rounded-[10px] text-[15px] text-text-primary placeholder-text-tertiary input-focus-ring transition-all"
+                                placeholder="请输入用户名/手机号">
+                        </div>
+
+                        <!-- 密码 -->
+                        <div class="space-y-1.5">
+                            <label class="block text-[14px] leading-[22px] font-medium text-text-secondary">密码</label>
+                            <div class="relative group">
+                                <input type="password" name="password" id="passwordInput" required 
+                                    class="block w-full h-[48px] px-4 bg-[#F9FAFB] border border-border rounded-[10px] text-[15px] text-text-primary placeholder-text-tertiary input-focus-ring transition-all pr-12"
+                                    placeholder="请输入密码">
+                                <!-- 眼睛图标热区 36x36 -->
+                                <button type="button" onclick="togglePassword()" 
+                                    class="absolute top-1.5 right-1.5 w-9 h-9 flex items-center justify-center rounded-lg text-text-tertiary hover:bg-gray-100 hover:text-text-secondary transition-colors focus:outline-none">
+                                    <i class="fa-solid fa-eye text-[18px]" id="toggleIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 辅助行 -->
+                    <div class="mt-5 flex items-center justify-between">
+                        <label class="flex items-center gap-2 cursor-pointer group select-none">
+                            <input type="checkbox" class="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary/20 cursor-pointer">
+                            <span class="text-[14px] text-text-secondary group-hover:text-text-primary transition-colors">保持登录</span>
+                        </label>
+                        <a href="#" class="text-[14px] font-medium text-primary hover:text-primary-hover hover:underline transition-colors">忘记密码？</a>
+                    </div>
+
+                    <!-- 主按钮 -->
+                    <div class="mt-6 space-y-6">
+                        <button type="submit" id="submitBtn"
+                            class="w-full h-[48px] flex items-center justify-center gap-2 border border-transparent rounded-[10px] text-[16px] font-semibold text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all shadow-sm">
+                            <span>登录</span>
+                            <!-- 箭头轻量化 -->
+                            <i class="fa-solid fa-arrow-right text-[14px] opacity-70 group-hover:translate-x-0.5 transition-transform"></i>
+                        </button>
+
+                        <!-- 注册引导 -->
+                        <div class="text-center">
+                            <p class="text-[14px] text-text-secondary">
+                                还没有账号？
+                                <a href="{{ url_for('account.register') }}" class="text-primary font-medium hover:underline">去注册</a>
+                            </p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function togglePassword() {
+            const input = document.getElementById('passwordInput');
+            const icon = document.getElementById('toggleIcon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            const btn = document.getElementById('submitBtn');
+            const icon = btn.querySelector('.fa-arrow-right');
+            const text = btn.querySelector('span');
+            
+            if (btn.disabled) {
+                e.preventDefault();
+                return;
+            }
+
+            btn.disabled = true;
+            text.textContent = '登录中...';
+            if (icon) {
+                icon.classList.remove('fa-arrow-right');
+                icon.classList.add('fa-circle-notch', 'fa-spin');
+            }
+        });
+    </script>
+</body>
+</html>

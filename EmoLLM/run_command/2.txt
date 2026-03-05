@@ -1,0 +1,117 @@
+# 在项目同级或任意目录
+python -m venv ~/.venvs/emorag
+source ~/.venvs/emorag/bin/activate   # Windows 用  .\.venvs\emorag\Scripts\activate
+python -V
+pip install --upgrade pip
+
+
+git clone https://github.com/SmartFlowAI/EmoLLM.git
+cd EmoLLM
+pip install -r requirements.txt
+
+
+cd rag
+pip install -r requirements.txt
+cd ..
+
+
+
+# 1. 下载 Miniconda 安装脚本（Python 3.11 版本）
+wget https://repo.anaconda.com/miniconda/Miniconda3-py311_24.1.2-0-Linux-x86_64.sh
+
+# 2. 执行安装（全程按回车/yes 确认，默认路径即可）
+bash Miniconda3-py311_24.1.2-0-Linux-x86_64.sh
+
+# 3. 生效 conda（无需重启终端）
+source ~/.bashrc
+
+# 4. 验证 conda 安装
+conda --version  # 输出 conda x.x.x
+
+
+# 1. 创建环境（环境名自定义，如 emo311，指定 Python 3.11）
+conda create -n emo311 python=3.11 -y
+
+# 2. 激活环境（命令行前显示 [emo311]）
+conda activate emo311
+
+python --version 
+
+# 退出环境
+conda deactivate
+
+# 查看所有 conda 环境
+conda env list
+
+# 删除环境（如需）
+conda remove -n emo311 --all -y
+
+conda config --show-sources  # 列出当前已配置的源
+
+
+
+hostname -I
+http://172.24.151.193:7860
+
+# 或导出完整（依赖树全含，但不同平台有时不完全可移植）
+conda env export --no-builds > environment.full.yml
+
+
+channels:
+  - defaults
+show_channel_urls: true
+default_channels:
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r
+  - https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2
+custom_channels:
+  conda-forge: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  msys2: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  bioconda: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  menpo: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  pytorch: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  pytorch-lts: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  simpleitk: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud
+  deepmodeling: https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/
+
+cd rag
+pip install -r requirements.txt
+cd ..
+下载官方向量库（不用自己做数据）
+# 方案一：OpenXLab 镜像
+git clone https://code.openxlab.org.cn/Anooyman/EmoLLMRAGTXT.git
+# 方案二：ModelScope 镜像（任选其一）
+# git clone https://www.modelscope.cn/datasets/Anooyman/EmoLLMRAGTXT.git
+
+# 统一放到 rag/src/data/vector_db 下
+mkdir -p rag/src/data/vector_db
+# 找到 index.faiss 与 index.pkl 的所在目录（可能在刚克隆的仓库里）
+# 假设文件就在 rag/EmoLLMRAGTXT/vector_db/
+cp -r EmoLLMRAGTXT/vector_db/* rag/src/data/vector_db/
+cd ..
+
+
+可选：预下载嵌入和重排模型（离线更稳）
+
+RAG 配置里默认使用
+
+BAAI/bge-small-zh-v1.5（embedding）
+
+BAAI/bge-reranker-large（rerank）
+并约定放在 model/embedding_model 与 model/rerank_model 下。你可以让它首跑自动下载，或手动提前下好：
+pip install "huggingface_hub[cli]"
+hf download BAAI/bge-small-zh-v1.5 --local-dir model/embedding_model
+hf download BAAI/bge-reranker-large --local-dir model/rerank_model
+
+# 确保当前在项目根目录 EmoLLM，仍然在 emo-rag 环境
+streamlit run web_internlm2.py --server.address 0.0.0.0 --server.port 7860
+
+
+验证是否生效
+
+打开网页，问一个只有知识库里才有的信息（例如心理学理论/术语）。如果一切正常，答案会引用到检索内容（尽管页面没有“RAG按钮”）。RAG 文档也说明“当用户选择使用RAG时才会进行上述流程”，而该脚本默认已选择 RAG 路径。
+GitHub
+
+
+
+

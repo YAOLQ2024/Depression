@@ -1,0 +1,990 @@
+{% extends "base.html" %}
+
+{% block title %}AI 心理咨询助手{% endblock %}
+
+{% block content %}
+<div class="relative m-0">
+    <main class="relative z-10 w-full p-[30px] h-[calc(100vh-4rem)]">
+        <div class="flex flex-col h-full" x-data="chatApp()">
+    
+    <!-- Header Area: 提示信息 (可关闭) -->
+    <div class="mb-4 shrink-0" x-show="showNotice" x-transition>
+        <div class="bg-blue-50 border border-blue-100 p-3 rounded-lg flex items-start gap-3 relative">
+            <div class="text-blue-600 mt-0.5"><i class="fa-solid fa-circle-info"></i></div>
+            <div class="flex-1 text-sm text-blue-800 leading-relaxed">
+                本服务由 AI 提供，仅用于日常情绪疏导，不具备危机干预能力。如遇紧急情况，请拨打当地心理援助热线。
+            </div>
+            <button @click="showNotice = false" class="text-blue-400 hover:text-blue-600 transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Chat Interface -->
+    <div class="flex-1 bg-white rounded-2xl shadow-sm border border-[#E5E8EF] overflow-hidden flex flex-col">
+        
+        <!-- Chat Header (可选，如果侧边栏已有高亮可省略，这里为了完整性加上) -->
+        <div class="h-16 border-b border-[#E5E8EF] flex items-center justify-between px-6 bg-white shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="relative">
+                    <div class="h-10 w-10 rounded-full overflow-hidden flex items-center justify-center shadow-sm"
+                         :class="isStreaming ? 'ai-avatar-breathe' : ''">
+                        <img src="{{ url_for('static', filename='img/AI_LOGO.png') }}" 
+                             alt="AI助手" 
+                             class="w-full h-full object-cover">
+                    </div>
+                    <span class="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white"></span>
+                </div>
+                <div>
+                    <h2 class="font-bold text-textPrimary text-base">AI 心理咨询助手</h2>
+                    <p class="text-xs text-textTertiary flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> 在线
+                    </p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2">
+                <button @click="toggleVoice" 
+                        class="p-2 rounded-lg transition-all"
+                        :class="isSpeaking ? 'text-[#165DFF] bg-blue-50 hover:bg-blue-100 animate-pulse' : 'text-textTertiary hover:bg-gray-50'"
+                        title="语音朗读">
+                    <i class="fa-solid fa-bell"></i>
+                </button>
+                <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-gray-50 rounded-lg border border-gray-100 transition-all"
+                     :class="hasAnalyzed ? 'opacity-50' : 'hover:bg-gray-100'">
+                    <input type="checkbox" 
+                           id="emotion-data" 
+                           x-model="includeReport"
+                           :disabled="hasAnalyzed || loading"
+                           class="accent-[#165DFF] h-4 w-4 rounded cursor-pointer disabled:cursor-not-allowed">
+                    <label for="emotion-data" 
+                           class="text-xs cursor-pointer select-none"
+                           :class="hasAnalyzed ? 'text-textTertiary cursor-not-allowed' : 'text-textSecondary'">允许 AI 参考测评数据</label>
+                </div>
+                <button class="p-2 text-textTertiary hover:bg-gray-50 rounded-lg transition-colors" title="清空对话" @click="clearHistory">
+                    <i class="fa-regular fa-trash-can"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Messages Area -->
+        <div class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-[#F7F9FC] custom-scrollbar" id="chat-container" style="max-height: calc(100vh - 300px);">
+            
+            <!-- Welcome Message -->
+            <div class="flex gap-4 max-w-3xl">
+                <div class="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center shrink-0 mt-1 shadow-sm">
+                    <img src="{{ url_for('static', filename='img/AI_LOGO.png') }}" 
+                         alt="AI助手" 
+                         class="w-full h-full object-cover">
+                </div>
+                <div class="space-y-1">
+                    <span class="text-xs text-textTertiary ml-1">AI 助手</span>
+                    <div class="p-4 rounded-2xl rounded-tl-sm text-sm leading-7 bg-white text-textPrimary border border-[#E5E8EF] shadow-sm">
+                        <p>您好，我是您的专属 AI 心理助手。🌟</p>
+                        <p class="mt-2">勾选右上角复选框，我可以阅读您的测评报告。无论您是想聊聊最近的压力，还是探讨报告中的建议，我都在这里倾听。今天想从哪里开始呢？</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Messages -->
+            <template x-for="(msg, index) in messages" :key="index">
+                <div class="flex gap-4 max-w-3xl group" :class="msg.role === 'user' ? 'ml-auto flex-row-reverse' : ''">
+                    
+                    <!-- Avatar -->
+                    <div class="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center shrink-0 mt-1 shadow-sm transition-transform group-hover:scale-105"
+                        :class="msg.role === 'user' ? 'bg-[#165DFF]' : ''"
+                        :style="msg.role === 'assistant' && index === streamingIndex && isStreaming ? 'animation: breathe 2s ease-in-out infinite;' : ''">
+                        <template x-if="msg.role === 'user'">
+                            <i class="fa-solid fa-user text-sm text-white"></i>
+                        </template>
+                        <template x-if="msg.role === 'assistant'">
+                            <img src="{{ url_for('static', filename='img/AI_LOGO.png') }}" 
+                                 alt="AI助手" 
+                                 class="w-full h-full object-cover">
+                        </template>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="space-y-1" :class="msg.role === 'user' ? 'text-right' : 'text-left'">
+                        <span class="text-xs text-textTertiary mx-1" x-text="msg.role === 'user' ? '我' : 'AI 助手'"></span>
+                        <div class="p-4 rounded-2xl text-sm leading-7 shadow-sm text-left break-words"
+                            :class="msg.role === 'user' ? 'bg-[#165DFF] text-white rounded-tr-sm' : 'bg-white text-textPrimary border border-[#E5E8EF] rounded-tl-sm'">
+                            <span class="markdown-body" x-show="msg.content" x-html="formatMessage(msg.content)"></span>
+                            <div x-show="!msg.content && index === streamingIndex && loading" class="flex items-center gap-2">
+                                <span class="w-1.5 h-1.5 bg-[#00B8A9] rounded-full animate-bounce" style="animation-delay: 0s"></span>
+                                <span class="w-1.5 h-1.5 bg-[#00B8A9] rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+                                <span class="w-1.5 h-1.5 bg-[#00B8A9] rounded-full animate-bounce" style="animation-delay: 0.4s"></span>
+                                <span class="text-xs text-textTertiary ml-2">正在思考...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Loading State - 只在没有流式消息时显示 -->
+            <div x-show="loading && streamingIndex < 0" x-cloak class="flex gap-4 max-w-3xl">
+                <div class="h-9 w-9 rounded-full overflow-hidden flex items-center justify-center shrink-0 mt-1 shadow-sm">
+                    <img src="{{ url_for('static', filename='img/AI_LOGO.png') }}" 
+                         alt="AI助手" 
+                         class="w-full h-full object-cover">
+                </div>
+                <div class="space-y-1">
+                    <span class="text-xs text-textTertiary ml-1">AI 助手</span>
+                    <div class="px-4 py-3 bg-white border border-[#E5E8EF] rounded-2xl rounded-tl-sm shadow-sm flex items-center gap-2">
+                        <span class="w-1.5 h-1.5 bg-[#00B8A9] rounded-full animate-bounce" style="animation-delay: 0s"></span>
+                        <span class="w-1.5 h-1.5 bg-[#00B8A9] rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+                        <span class="w-1.5 h-1.5 bg-[#00B8A9] rounded-full animate-bounce" style="animation-delay: 0.4s"></span>
+                        <span class="text-xs text-textTertiary ml-2">正在思考...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-4 md:p-6 bg-white border-t border-[#E5E8EF] shrink-0">
+            <div class="max-w-4xl mx-auto">
+                <div class="flex gap-2 items-stretch">
+                    <div class="flex-1 relative">
+                        <!-- 联网搜索按钮（在输入框内部最左侧） -->
+                        <button @click.stop="webSearchEnabled = !webSearchEnabled" 
+                            :class="webSearchEnabled ? 'text-[#165DFF]' : 'text-textTertiary hover:text-textSecondary'"
+                            class="absolute left-3 bottom-[22px] z-10 transition-colors cursor-pointer flex items-end"
+                            :disabled="loading"
+                            title="联网搜索">
+                            <i class="fa-solid fa-globe text-base"></i>
+                        </button>
+                        <textarea x-model="userInput" 
+                            @keydown="handleKeydown($event)"
+                            rows="1"
+                            class="w-full pl-10 pr-5 py-4 bg-[#F7F9FC] border border-[#E5E8EF] rounded-xl text-sm text-textPrimary placeholder-textTertiary focus:outline-none focus:bg-white focus:border-[#165DFF] focus:ring-2 focus:ring-[#165DFF]/20 transition-all resize-none custom-scrollbar shadow-inner"
+                            placeholder="输入您想聊的内容... (Enter 发送，Shift + Enter 换行)" :disabled="loading"
+                            @input="$el.style.height = 'auto'; $el.style.height = $el.scrollHeight + 'px'"
+                            style="min-height: 56px;"></textarea>
+                    </div>
+                    
+                    <button @click="startVoiceRecording" 
+                        :class="isRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-slate-500 hover:bg-slate-600'"
+                        class="w-[53px] h-[53px] text-white rounded-xl transition-all shadow-md hover:shadow-lg flex items-center justify-center"
+                        :disabled="loading"
+                        title="语音输入">
+                        <i class="fa-solid fa-microphone text-sm"></i>
+                    </button>
+                    
+                    <button @click="sendMessage" :disabled="loading || !userInput.trim()"
+                        class="w-[53px] h-[53px] bg-[#165DFF] hover:bg-[#165DFF]/90 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl transition-all shadow-md hover:shadow-lg disabled:shadow-none flex items-center justify-center">
+                        <i class="fa-solid fa-paper-plane text-sm"></i>
+                    </button>
+                </div>
+            </div>
+            <p class="text-center text-[10px] text-textTertiary mt-3">
+                AI 内容由大模型生成，可能存在不准确信息，请注意甄别。
+            </p>
+        </div>
+    </div>
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- 引入 Markdown 解析库 -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+    @keyframes breathe {
+        0%, 100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+        50% {
+            transform: scale(1.5);
+            opacity: 0.85;
+        }
+    }
+    
+    .ai-avatar-breathe {
+        animation: breathe 2s ease-in-out infinite;
+    }
+    
+    /* === Markdown 内容样式修复 === */
+    /* 针对 AI 回复的气泡（白色背景）内的 Markdown 内容 */
+    .bg-white .markdown-body ul, .bg-white .markdown-body ol {
+        list-style-type: disc; /* 恢复列表圆点 */
+        padding-left: 20px;    /* 恢复列表缩进 */
+        margin: 8px 0;
+    }
+    
+    .bg-white .markdown-body ol {
+        list-style-type: decimal; /* 有序列表数字 */
+    }
+
+    .bg-white .markdown-body p {
+        margin-bottom: 8px; /* 段落间距 */
+    }
+    
+    .bg-white .markdown-body p:last-child {
+        margin-bottom: 0;
+    }
+
+    .bg-white .markdown-body strong {
+        font-weight: 700; /* 加粗 */
+        color: #1d2129;   /* 更深的颜色 */
+    }
+    
+    /* ========================================= */
+    /* 新增：恢复被 Tailwind 重置的 Markdown 标题样式 */
+    /* ========================================= */
+    .bg-white .markdown-body h1 {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #1d2129;
+        margin-top: 16px;
+        margin-bottom: 8px;
+        border-bottom: 1px solid #e5e6eb;
+        padding-bottom: 4px;
+    }
+    .bg-white .markdown-body h2 {
+        font-size: 1.25em;
+        font-weight: bold;
+        color: #1d2129;
+        margin-top: 16px;
+        margin-bottom: 8px;
+    }
+    .bg-white .markdown-body h3 {
+        font-size: 1.15em;
+        font-weight: bold;
+        color: #1d2129;
+        margin-top: 12px;
+        margin-bottom: 6px;
+    }
+    .bg-white .markdown-body h4 {
+        font-size: 1.05em;
+        font-weight: bold;
+        color: #1d2129;
+        margin-top: 12px;
+        margin-bottom: 6px;
+    }
+    /* ========================================= */
+    
+    .bg-white .markdown-body a {
+        color: #165DFF;
+        text-decoration: underline;
+    }
+
+    /* 代码块样式 */
+    .bg-white .markdown-body pre {
+        background-color: #f4f6f8;
+        padding: 12px;
+        border-radius: 8px;
+        overflow-x: auto;
+        font-family: monospace;
+        margin: 8px 0;
+    }
+    
+    .bg-white .markdown-body code {
+        background-color: #f4f6f8;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.9em;
+        color: #c7254e;
+    }
+
+    /* 引用样式 */
+    .bg-white .markdown-body blockquote {
+        border-left: 4px solid #e5e6eb;
+        padding-left: 12px;
+        color: #86909c;
+        margin: 8px 0;
+    }
+
+    /* 针对用户气泡（蓝色背景）的特殊处理，保持白色文字 */
+    .bg-\[\#165DFF\] .markdown-body strong {
+        color: white;
+    }
+    .bg-\[\#165DFF\] .markdown-body a {
+        color: white;
+    }
+</style>
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('chatApp', () => ({
+        userInput: '',
+        loading: false,
+        messages: [],
+        showNotice: true,
+        includeReport: false,  // 复选框状态
+        hasAnalyzed: false,  // 标记是否已经分析过报告
+        reportData: null,  // 报告数据
+        isLoadingReport: false,  // 是否正在加载报告
+        isRecording: false,  // 语音录制状态
+        recognition: null,  // 语音识别对象
+        voiceEnabled: true,  // 语音朗读开关
+        webSearchEnabled: false,  // 联网搜索开关（仅UI，功能已移除）
+        currentUtterance: null,  // 当前语音合成对象
+        streamingMessage: '',  // 正在流式输出的消息内容
+        streamingIndex: -1,  // 正在流式输出的消息索引
+        isStreaming: false,  // 是否正在流式输出
+        isSpeaking: false,  // 是否正在朗读
+        lastSpokenLength: 0,  // 已朗读的文本长度
+        speakQueue: '',  // 朗读队列
+        currentSpeakingText: '',  // 当前正在朗读的完整文本
+        selectedVoice: null,  // 选定的语音
+        isStreamingComplete: false,  // 流式输出是否已完成
+
+        init() {
+            // 从localStorage加载状态
+            this.loadState();
+            // 初始化语音识别
+            this.initSpeechRecognition();
+            // 初始化语音选择
+            this.initVoiceSelection();
+        },
+
+        initVoiceSelection() {
+            // 获取可用的语音列表并选择最好听的中文语音
+            const getVoices = () => {
+                const voices = window.speechSynthesis.getVoices();
+                
+                // 优先选择Google 普通话（中国大陆）
+                const googleVoice = voices.find(v => 
+                    v.name.includes('Google') && 
+                    (v.name.includes('普通话') || v.name.includes('Mandarin') || v.name.includes('Chinese')) &&
+                    (v.lang.startsWith('zh-CN') || v.lang === 'zh' || v.lang.includes('zh-CN'))
+                );
+                
+                if (googleVoice) {
+                    this.selectedVoice = googleVoice;
+                    console.log('选择语音:', googleVoice.name, googleVoice.lang);
+                    return;
+                }
+                
+                // 如果没有找到Google语音，尝试其他高质量语音
+                const preferredVoices = [
+                    'Microsoft Xiaoxiao - Chinese (Simplified)',  // 微软晓晓（女声，自然）
+                    'Microsoft Xiaoyi - Chinese (Simplified)',   // 微软晓伊（女声，温柔）
+                    'Microsoft Kangkang - Chinese (Simplified)', // 微软康康（男声）
+                    'Microsoft Yaoyao - Chinese (Simplified)',   // 微软瑶瑶（女声，活泼）
+                    'Ting-Ting',                                  // Mac系统中文女声
+                    'Sin-Ji',                                     // Mac系统中文女声
+                ];
+                
+                // 尝试匹配其他优先语音
+                for (const preferredName of preferredVoices) {
+                    const voice = voices.find(v => v.name.includes(preferredName) || preferredName.includes(v.name));
+                    if (voice && (voice.lang.startsWith('zh') || voice.lang.includes('Chinese'))) {
+                        this.selectedVoice = voice;
+                        console.log('选择语音:', voice.name, voice.lang);
+                        return;
+                    }
+                }
+                
+                // 如果没有找到优先语音，选择第一个中文语音
+                const chineseVoice = voices.find(v => 
+                    v.lang.startsWith('zh') || 
+                    v.lang.includes('Chinese') || 
+                    v.name.includes('中文') || 
+                    v.name.includes('Chinese')
+                );
+                
+                if (chineseVoice) {
+                    this.selectedVoice = chineseVoice;
+                    console.log('选择语音:', chineseVoice.name, chineseVoice.lang);
+                } else {
+                    // 如果还是没有，使用默认语音
+                    console.warn('未找到中文语音，使用默认语音');
+                }
+            };
+            
+            // 立即尝试获取（某些浏览器需要等待）
+            getVoices();
+            
+            // 监听语音列表变化（某些浏览器需要异步加载）
+            if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = getVoices;
+            }
+        },
+
+        handleKeydown(event) {
+            // 处理键盘事件：Enter发送，Shift+Enter换行
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                if (!this.loading && this.userInput.trim()) {
+                    this.sendMessage();
+                }
+            }
+            // Shift+Enter 不做处理，允许默认换行行为
+        },
+
+        loadState() {
+            // 加载hasAnalyzed状态
+            const saved = localStorage.getItem('counseling_hasAnalyzed');
+            this.hasAnalyzed = saved === 'true';
+            
+            // 加载消息记录
+            const savedMessages = localStorage.getItem('counseling_messages');
+            if (savedMessages) {
+                try {
+                    this.messages = JSON.parse(savedMessages);
+                } catch (e) {
+                    console.error('加载消息记录失败:', e);
+                    this.messages = [];
+                }
+            }
+        },
+
+        saveState() {
+            // 保存状态到localStorage
+            localStorage.setItem('counseling_hasAnalyzed', String(this.hasAnalyzed));
+            localStorage.setItem('counseling_messages', JSON.stringify(this.messages));
+        },
+
+        async loadReportData() {
+            // 加载最新的报告数据
+            if (this.isLoadingReport || this.reportData) return;
+            
+            this.isLoadingReport = true;
+            try {
+                const response = await fetch("{{ url_for('psychological_counseling.get_latest_report') }}");
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'success' && data.data) {
+                        this.reportData = data.data;
+                    }
+                }
+            } catch (error) {
+                console.error('加载报告数据失败:', error);
+            } finally {
+                this.isLoadingReport = false;
+            }
+        },
+
+        buildAnalysisPrompt() {
+            // 构建包含报告数据的提示词（优化版本，减少长度）
+            if (!this.reportData) return '';
+            
+            let prompt = '请分析以下测评报告数据：\n\n';
+            
+            // 基本信息（简化）
+            prompt += `【基本信息】SDS标准分: ${this.reportData.score}, 抑郁程度: ${this.reportData.result}`;
+            if (this.reportData.comprehensive_score) {
+                prompt += `, 综合评分: ${this.reportData.comprehensive_score}`;
+            }
+            prompt += `, 完成时间: ${this.reportData.finish_time}\n\n`;
+            
+            // 综合评分结果（简化，只保留关键信息）
+            if (this.reportData.comprehensive_result) {
+                const comp = this.reportData.comprehensive_result;
+                prompt += `【综合评分】`;
+                if (comp.depression_level) prompt += ` 抑郁等级: ${comp.depression_level}`;
+                if (comp.comprehensive_score) prompt += ` 综合分: ${comp.comprehensive_score}`;
+                if (comp.sds_score) prompt += ` SDS分: ${comp.sds_score}`;
+                prompt += '\n\n';
+            }
+            
+            // 表情数据（简化，只保留摘要）
+            if (this.reportData.emotion_data) {
+                const emotion = this.reportData.emotion_data;
+                if (emotion.summary) {
+                    prompt += `【表情识别】${JSON.stringify(emotion.summary)}\n\n`;
+                } else {
+                    // 只保留关键字段
+                    const simplified = {};
+                    if (emotion.dominant_emotion) simplified.dominant_emotion = emotion.dominant_emotion;
+                    if (emotion.total_detections) simplified.total_detections = emotion.total_detections;
+                    if (Object.keys(simplified).length > 0) {
+                        prompt += `【表情识别】${JSON.stringify(simplified)}\n\n`;
+                    }
+                }
+            }
+            
+            // 答题详情（只保留高分题目）
+            if (this.reportData.details && this.reportData.details.length > 0) {
+                const highScoreItems = this.reportData.details.filter(item => item.score >= 3);
+                if (highScoreItems.length > 0) {
+                    prompt += `【高分题目】`;
+                    highScoreItems.forEach(item => {
+                        prompt += ` ${item.question_id}(${item.score}分)`;
+                    });
+                    prompt += '\n\n';
+                }
+            }
+            
+            prompt += '请基于以上数据，提供详细的分析和建议。';
+            
+            return prompt;
+        },
+
+        formatMessage(content) {
+            if (!content) return '';
+            
+            // 1. 去除开头的空白（防止流式输出时的空白气泡）
+            let cleanContent = content.trimStart();
+            
+            // 2. 使用 marked 将 Markdown 转换为 HTML
+            // marked 可能会把纯文本会被包裹在 <p> 标签中，这在气泡里是正常的
+            try {
+                return marked.parse(cleanContent);
+            } catch (e) {
+                console.error('Markdown解析失败:', e);
+                return cleanContent; // 降级处理：直接显示原文
+            }
+        },
+
+        clearHistory() {
+            if(confirm('确定要清空当前对话记录吗？')) {
+                this.messages = [];
+                this.hasAnalyzed = false;
+                this.includeReport = false;
+                this.reportData = null;
+                // 清除localStorage
+                localStorage.removeItem('counseling_hasAnalyzed');
+                localStorage.removeItem('counseling_messages');
+            }
+        },
+
+        initSpeechRecognition() {
+            // 检查浏览器是否支持语音识别
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                console.warn('当前浏览器不支持语音识别功能');
+                return;
+            }
+            
+            this.recognition = new SpeechRecognition();
+            this.recognition.lang = 'zh-CN';
+            this.recognition.continuous = false;
+            this.recognition.interimResults = true;
+            
+            this.recognition.onstart = () => {
+                this.isRecording = true;
+            };
+            
+            this.recognition.onresult = async (event) => {
+                const transcript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
+                
+                if (event.results[0].isFinal) {
+                    // 发送到后端处理（使用dolphin）
+                    try {
+                        const response = await fetch('/test/process', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ text: transcript })
+                        });
+                        const data = await response.json();
+                        if (data.text) {
+                            this.userInput = data.text;
+                        } else {
+                            this.userInput = transcript;
+                        }
+                    } catch (error) {
+                        console.error('语音处理失败:', error);
+                        this.userInput = transcript;
+                    }
+                }
+            };
+            
+            this.recognition.onend = () => {
+                this.isRecording = false;
+            };
+            
+            this.recognition.onerror = (event) => {
+                console.error('语音识别错误:', event.error);
+                this.isRecording = false;
+            };
+        },
+
+        startVoiceRecording() {
+            if (!this.recognition) {
+                alert('语音识别功能不可用，请使用支持该功能的浏览器（如Chrome）');
+                return;
+            }
+            
+            if (this.isRecording) {
+                this.recognition.stop();
+            } else {
+                try {
+                    this.recognition.start();
+                } catch (error) {
+                    console.error('启动语音识别失败:', error);
+                }
+            }
+        },
+
+        toggleVoice() {
+            if (this.isSpeaking) {
+                // 关闭：立即停止所有朗读，清空队列
+                window.speechSynthesis.cancel();
+                this.isSpeaking = false;
+                this.voiceEnabled = false;
+            } else {
+                // 开启
+                this.voiceEnabled = true;
+                
+                // 如果当前这则消息还没读完（比如中途关了又开，或者刚生成完）
+                // 检查当前最后一条消息是不是 AI 发的
+                const lastMsg = this.messages[this.messages.length - 1];
+                if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content) {
+                    // 如果已经全部读过了，就不读了
+                    // 否则读取剩余部分
+                    if (this.lastSpokenLength < lastMsg.content.length) {
+                        this.updateSpeechQueue(lastMsg.content, true); // true 强制读完尾巴
+                    }
+                }
+            }
+        },
+        
+        // 开始新的AI回复时，如果之前被手动关闭了，重新开启朗读
+        resetVoiceForNewMessage() {
+            // 如果voiceEnabled为false（被手动关闭），在新消息时重新开启
+            // 但只在有新的流式输出时才开启，避免干扰用户的手动操作
+            if (!this.voiceEnabled) {
+                this.voiceEnabled = true;
+            }
+        },
+
+        // 过滤表情符号和特殊符号
+        filterEmojis(text) {
+            if (!text) return '';
+            
+            // 匹配表情符号的正则表达式（包括emoji、颜文字等）
+            const emojiRegex = /[\u{1F300}-\u{1F9FF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{200D}]|[\u{FE00}-\u{FE0F}]|[\u{203C}]|[\u{2049}]|[\u{2122}]|[\u{2139}]|[\u{2194}-\u{2199}]|[\u{21A9}-\u{21AA}]|[\u{231A}-\u{231B}]|[\u{2328}]|[\u{23CF}]|[\u{23E9}-\u{23F3}]|[\u{23F8}-\u{23FA}]|[\u{24C2}]|[\u{25AA}-\u{25AB}]|[\u{25B6}]|[\u{25C0}]|[\u{25FB}-\u{25FE}]|[\u{2600}-\u{2604}]|[\u{260E}]|[\u{2611}]|[\u{2614}-\u{2615}]|[\u{2618}]|[\u{261D}]|[\u{2620}]|[\u{2622}-\u{2623}]|[\u{2626}]|[\u{262A}]|[\u{262E}-\u{262F}]|[\u{2638}-\u{263A}]|[\u{2640}]|[\u{2642}]|[\u{2648}-\u{2653}]|[\u{2660}]|[\u{2663}]|[\u{2665}-\u{2666}]|[\u{2668}]|[\u{267B}]|[\u{267F}]|[\u{2692}-\u{2697}]|[\u{2699}]|[\u{269B}-\u{269C}]|[\u{26A0}-\u{26A1}]|[\u{26AA}-\u{26AB}]|[\u{26B0}-\u{26B1}]|[\u{26BD}-\u{26BE}]|[\u{26C4}-\u{26C5}]|[\u{26C8}]|[\u{26CE}]|[\u{26CF}]|[\u{26D1}]|[\u{26D3}-\u{26D4}]|[\u{26E9}-\u{26EA}]|[\u{26F0}-\u{26F5}]|[\u{26F7}-\u{26FA}]|[\u{26FD}]|[\u{2702}]|[\u{2705}]|[\u{2708}-\u{270D}]|[\u{270F}]|[\u{2712}]|[\u{2714}]|[\u{2716}]|[\u{271D}]|[\u{2721}]|[\u{2728}]|[\u{2733}-\u{2734}]|[\u{2744}]|[\u{2747}]|[\u{274C}]|[\u{274E}]|[\u{2753}-\u{2755}]|[\u{2757}]|[\u{2763}-\u{2764}]|[\u{2795}-\u{2797}]|[\u{27A1}]|[\u{27B0}]|[\u{27BF}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{2B50}]|[\u{2B55}]|[\u{3030}]|[\u{303D}]|[\u{3297}]|[\u{3299}]/gu;
+            
+            // 过滤表情符号
+            let cleaned = text.replace(emojiRegex, '');
+            
+            // 过滤特殊符号（Markdown格式符号、数学符号等）
+            // 这些符号在朗读时会产生噪音或无法正确发音
+            const specialCharsRegex = /[*~_`#^|{}\[\]()<>=\+\-!@$%&\\\/?:;"'.,]/g;
+            cleaned = cleaned.replace(specialCharsRegex, ' ');
+            
+            // 清理多余的空格和换行
+            cleaned = cleaned.replace(/\s+/g, ' ').trim();
+            
+            return cleaned;
+        },
+
+        speakText(text, cancelPrevious = false) {
+            if (!this.voiceEnabled || !text) return;
+            
+            // 过滤表情符号
+            const cleanText = this.filterEmojis(text);
+            if (!cleanText || cleanText.trim().length === 0) return;
+            
+            // 确保语音系统已初始化
+            if (!this.selectedVoice) {
+                this.initVoiceSelection();
+            }
+            
+            // 只有在显式要求打断（如切换开关/开始新对话）时才 cancel
+            if (cancelPrevious) {
+                window.speechSynthesis.cancel();
+            }
+
+            // --- 修复吞字问题的核心逻辑 ---
+            
+            // 1. 显式唤醒：Chrome/Edge 有时会挂起语音进程，resume 可以强制唤醒
+            window.speechSynthesis.resume();
+
+            let textToPlay = cleanText;
+
+            // 2. 添加缓冲：如果当前引擎是空闲的（或者刚被打断），说明是"冷启动"
+            // 在开头加一个中文逗号。引擎会尝试读这个逗号（产生微小静音）。
+            // 唤醒过程中的"吞字"现象会吞掉这个逗号，从而保护后面的正文。
+            const isEngineCold = !window.speechSynthesis.speaking && !window.speechSynthesis.pending;
+            if (isEngineCold || cancelPrevious) {
+                textToPlay = '，' + textToPlay;
+            }
+            // ---------------------------
+            
+            const utterance = new SpeechSynthesisUtterance(textToPlay);
+            utterance.lang = 'zh-CN';
+            
+            if (this.selectedVoice) {
+                utterance.voice = this.selectedVoice;
+            }
+            
+            // 稍微调快一点语速，补偿加了逗号带来的轻微延迟感
+            utterance.rate = 1.0; 
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            utterance.onstart = () => {
+                this.isSpeaking = true;
+            };
+            
+            utterance.onend = () => {
+                // 只有当内部队列彻底空了，才标记为不说话
+                if (!window.speechSynthesis.pending) {
+                    this.isSpeaking = false;
+                    this.currentUtterance = null;
+                }
+            };
+            
+            utterance.onerror = (e) => {
+                console.error('语音朗读错误:', e);
+                this.isSpeaking = false;
+                this.currentUtterance = null;
+            };
+            
+            // 3. 微小延迟：给 resume 一点点生效时间（可选，但推荐）
+            setTimeout(() => {
+                window.speechSynthesis.speak(utterance);
+                this.currentUtterance = utterance;
+            }, 10);
+        },
+
+        updateSpeechQueue(fullText, isFinal = false) {
+            if (!this.voiceEnabled || !fullText) return;
+            
+            // 确保 lastSpokenLength 已初始化
+            if (this.lastSpokenLength === undefined) {
+                this.lastSpokenLength = 0;
+            }
+            
+            // 获取还没朗读的文本片段
+            let remainingText = fullText.substring(this.lastSpokenLength);
+            if (remainingText.length === 0) return;
+
+            // 定义句尾标点符号 (包括中文和英文)
+            // 遇到这些符号认为是一句话结束
+            const sentenceEndings = /[。！？；!?;\n]+/;
+
+            let match;
+            // 循环查找这段文本里所有的完整句子
+            // 比如一次性发来了 "你好。我是AI。" 哪怕 speaking 正在读上一句，这里也要把这两句都加入队列
+            while ((match = sentenceEndings.exec(remainingText)) !== null) {
+                // 计算这句话结束的位置（相对于 remainingText）
+                const endOfSentenceIndex = match.index + match[0].length;
+                
+                // 截取这句话
+                const sentenceToSpeak = remainingText.substring(0, endOfSentenceIndex);
+                
+                // 朗读
+                if (sentenceToSpeak.trim().length > 0) {
+                    this.speakText(sentenceToSpeak, false);
+                }
+                
+                // 更新全局指针：已处理长度 += 这句话的长度
+                this.lastSpokenLength += sentenceToSpeak.length;
+                
+                // 剩下的文本继续循环
+                remainingText = remainingText.substring(endOfSentenceIndex);
+            }
+
+            // 如果是最后一次流式输出（isFinal=true），且还有剩余没有标点的文本（尾巴），强制读完
+            if (isFinal && remainingText.trim().length > 0) {
+                this.speakText(remainingText, false);
+                this.lastSpokenLength += remainingText.length;
+            }
+        },
+
+        async sendMessage() {
+            if (!this.userInput.trim() || this.loading) return;
+
+            const content = this.userInput;
+            this.messages.push({ role: 'user', content: content });
+            this.userInput = '';
+            
+            // 重置 textarea 高度
+            this.$nextTick(() => {
+                const textarea = document.querySelector('textarea');
+                if(textarea) textarea.style.height = 'auto';
+                this.scrollToBottom();
+            });
+
+            this.loading = true;
+            this.streamingMessage = '';
+            this.streamingIndex = this.messages.length;  // 新消息的索引
+            this.messages.push({ role: 'assistant', content: '' });  // 占位消息
+            this.lastSpokenLength = 0;  // 重置朗读位置
+            this.speakQueue = '';  // 清空朗读队列
+            this.currentSpeakingText = '';  // 清空当前朗读文本
+            this.isStreamingComplete = false;  // 重置流式输出完成标志
+            this.scrollToBottom();
+            
+            // 开始新的AI回复时，如果之前被手动关闭了，重新开启朗读
+            this.resetVoiceForNewMessage();
+            
+            // 确保语音系统已初始化
+            if (!this.selectedVoice) {
+                this.initVoiceSelection();
+            }
+            
+            // 开始流式输出时，喇叭按钮闪烁
+            this.isStreaming = true;
+
+            try {
+                // 检查是否需要包含报告数据
+                let actualMessage = content;
+                if (this.includeReport && !this.hasAnalyzed) {
+                    // 确保报告数据已加载
+                    if (!this.reportData) {
+                        await this.loadReportData();
+                    }
+                    // 构建包含报告数据的提示词
+                    const analysisPrompt = this.buildAnalysisPrompt();
+                    if (analysisPrompt) {
+                        // 将用户消息和报告数据组合
+                        actualMessage = `${analysisPrompt}\n\n用户问题：${content}`;
+                        this.hasAnalyzed = true;  // 标记已分析，避免重复触发
+                        this.includeReport = false;  // 重置复选框
+                        // 保存状态
+                        this.saveState();
+                    }
+                }
+
+                // 构建历史记录（格式：[(用户消息, AI回复), ...]）
+                const history = [];
+                for (let i = 0; i < this.messages.length - 2; i++) {  // -2 因为最后一个是占位消息
+                    if (this.messages[i].role === 'user' && this.messages[i + 1] && this.messages[i + 1].role === 'assistant') {
+                        history.push([this.messages[i].content, this.messages[i + 1].content]);
+                    }
+                }
+
+                // 使用EventSource接收流式响应
+                const response = await fetch("{{ url_for('psychological_counseling.chat') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        message: actualMessage,
+                        include_emotion: false,
+                        web_search: this.webSearchEnabled,  // 发送搜索开关状态
+                        history: history,
+                        stream: true  // 启用流式输出
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Network error');
+                }
+                
+                // 读取流式响应
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let hasReceivedFirstChunk = false;  // 标记是否收到第一个chunk
+                
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop();  // 保留最后一个不完整的行
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.chunk) {
+                                    // 收到第一个chunk时，确保isStreaming为true（触发喇叭闪烁）
+                                    if (!hasReceivedFirstChunk) {
+                                        hasReceivedFirstChunk = true;
+                                        this.isStreaming = true;
+                                    }
+                                    
+                                    // 追加内容
+                                    // 流式输出粒度：后端API返回的chunk可能是一个字、一个词或一个短语
+                                    // 这取决于模型和API的实现，我们直接追加即可
+                                    // 通常是一个字或一个词，不是等到标点符号才输出
+                                    this.streamingMessage += data.chunk;
+                                    this.messages[this.streamingIndex].content = this.streamingMessage;
+                                    
+                                    // 保存完整文本用于重新朗读
+                                    this.currentSpeakingText = this.streamingMessage;
+                                    
+                                    // 更新语音朗读队列
+                                    // 直接调用 updateSpeechQueue，不需要节流
+                                    // 浏览器的队列机制可以处理高频调用，而且我们在 updateSpeechQueue 里有标点检测
+                                    // 只有凑够一句才会真正调用 speak
+                                    if (this.voiceEnabled) {
+                                        // 确保语音系统已初始化
+                                        if (!this.selectedVoice) {
+                                            this.initVoiceSelection();
+                                        }
+                                        this.updateSpeechQueue(this.streamingMessage, false);
+                                    }
+                                    
+                                    this.scrollToBottom();
+                                }
+                                if (data.done) {
+                                    // 流式输出完成
+                                    this.isStreaming = false;
+                                    this.isStreamingComplete = true;
+                                    
+                                    if (data.full_response) {
+                                        // 确保最终文本一致
+                                        this.messages[this.streamingIndex].content = data.full_response;
+                                        this.streamingMessage = data.full_response;
+                                        this.currentSpeakingText = data.full_response;
+                                        
+                                        // 最终刷新：传入 true，表示这是最后一次，强制朗读剩余的无标点文本
+                                        if (this.voiceEnabled) {
+                                            this.updateSpeechQueue(data.full_response, true);
+                                        }
+                                    } else {
+                                        // 如果没有 full_response，用累积的流文本做最后一次刷新
+                                        if (this.voiceEnabled) {
+                                            this.updateSpeechQueue(this.streamingMessage, true);
+                                        }
+                                    }
+                                    // 保存消息记录
+                                    this.saveState();
+                                    break;
+                                }
+                                if (data.error) {
+                                    this.isStreaming = false;
+                                    throw new Error(data.error);
+                                }
+                            } catch (e) {
+                                console.error('解析流式数据失败:', e);
+                            }
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                this.isStreaming = false;
+                if (this.streamingIndex >= 0 && this.streamingIndex < this.messages.length) {
+                    this.messages[this.streamingIndex].content = "系统暂时繁忙，请稍后再试。错误：" + (error.message || '未知错误');
+                } else {
+                    this.messages.push({ 
+                        role: 'assistant', 
+                        content: "系统暂时繁忙，请稍后再试。错误：" + (error.message || '未知错误') 
+                    });
+                }
+                // 即使出错也保存消息记录
+                this.saveState();
+            } finally {
+                this.loading = false;
+                // 延迟一点再关闭isStreaming，确保UI更新
+                setTimeout(() => {
+                    this.isStreaming = false;
+                }, 100);
+                this.streamingMessage = '';
+                this.streamingIndex = -1;
+                this.lastSpokenLength = 0;
+                this.speakQueue = '';
+                this.scrollToBottom();
+            }
+        },
+
+        scrollToBottom() {
+            this.$nextTick(() => {
+                const container = document.getElementById('chat-container');
+                if (container) {
+                    container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        }
+    }))
+})
+</script>
+{% endblock %}

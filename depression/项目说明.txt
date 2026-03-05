@@ -1,0 +1,239 @@
+================================================================================
+                    yiyuzhen_project 项目说明文档
+================================================================================
+本文档介绍项目用途、使用流程、模块与作用、项目结构、主要文件及使用方法。
+================================================================================
+
+一、项目是干什么的
+================================================================================
+
+yiyuzhen_project 是一个「抑郁症评估与心理咨询」Web 系统，主要功能包括：
+
+1. 用户与权限
+   - 用户注册、登录（支持用户名或手机号）、登出
+   - 角色区分：普通用户仅看自己的测评记录，管理员(role=2)可看全部
+
+2. SDS 抑郁自评
+   - 20 题 SDS（Self-rating Depression Scale）自评量表
+   - 支持纯问卷提交，也支持「问卷 + 表情 + 脑电」三模态综合测评
+   - 答题过程中可开启：实时表情识别（摄像头）、语音答题（Dolphin ASR）、脑电数据（串口设备，可选）
+
+3. 综合评分
+   - 综合分 = SDS 分数(60%) + 表情识别分数(25%) + 脑电分数(15%)
+   - 根据综合分给出抑郁程度：无抑郁 / 轻度 / 中度 / 重度
+   - 结果可查看「仅 SDS 详情」或「综合评分详情」（含表情、脑电等）
+
+4. 心理咨询（EmoLLM 集成）
+   - 聊天式心理咨询界面
+   - 后端通过「硅基流动」等 API 调用大模型（如 DeepSeek）
+   - 支持流式输出、可选联网搜索(Tavily)、可选带入用户最近测评报告做上下文
+
+5. 多硬件支持
+   - GPU 版：NVIDIA GPU + ONNX Runtime GPU + Dolphin ASR，适合台式/服务器
+   - NPU 版：昇腾 NPU，适合启智等板子
+   - 无 GPU/NPU 时自动退化为 CPU 推理
+
+6. 数据与报告
+   - SQLite 数据库存储用户、测评记录、SDS 选项与分数、综合结果、表情数据等
+   - 历史记录列表、单次测评详情、综合详情、提交成功页
+   - 心理咨询可拉取「最近一次测评报告」供 AI 参考
+
+
+二、使用流程（从打开系统到看完结果）
+================================================================================
+
+1. 启动系统
+   - 进入项目目录，激活 conda 环境（如 depression）
+   - 有 NVIDIA GPU：运行 python3 start_app_gpu.py
+   - 启智 NPU 板子：运行 python3 start_app_npu.py
+   - 浏览器访问 http://本机IP:5000（本机可用 http://localhost:5000）
+
+2. 登录 / 注册
+   - 默认测试账号：用户名 DSH，密码 1
+   - 新用户可注册（用户名、手机号、密码），再登录
+
+3. 做一次 SDS 测评（含表情、语音、脑电）
+   - 首页点击进入测评 → 进入 SDS 测评页（SDS_working2.html）
+   - 答题方式：点选选项，或使用语音（Dolphin ASR 识别「选 A/B/C/D」或「1/2/3/4」）
+   - 若开启摄像头：页面会拉取 MJPEG 视频流，后端做实时表情识别，提交时把表情数据一起上传
+   - 若连接脑电设备：脑电接收器在后台跑，测评页可展示脑电相关状态/数据（若前端有对接）
+   - 20 题答完点击提交：
+     - 仅问卷：走 /SDS/submit，只存 SDS 分数与抑郁等级
+     - 问卷+表情（+脑电）：走 /SDS/submit_with_emotion，会算综合分并存综合结果、表情数据
+
+4. 查看结果
+   - 提交成功页可跳转到「历史记录」
+   - 历史记录列表：每条可点「详情」→ 仅 SDS 的 detail，或「综合详情」→ comprehensive_detail
+   - 综合详情页展示：SDS 各题、综合分、抑郁等级、表情分析、脑电相关结论（若有）
+
+5. 心理咨询
+   - 从菜单/入口进入「心理咨询」页（/counseling）
+   - 输入框发消息，后端调用 EmoLLM 客户端（硅基流动 API + 可选 Tavily 联网）
+   - 可勾选「带入最近测评报告」，系统会拉取该用户最近一次测评的 report 内容作为上下文
+   - 支持流式输出与健康检查接口 /api/chat/health
+
+
+三、模块与作用
+================================================================================
+
+3.1 应用入口与启动
+   - start_app_gpu.py：GPU 版启动脚本。检查 CUDA/ONNX、初始化 Dolphin 语音、GPU 表情、MJPEG 流，再启动 Flask。
+   - start_app_npu.py：NPU 版启动脚本。检查昇腾环境、初始化 NPU 语音/表情/MJPEG，再启动 Flask。
+   - my_flask_app/app.py：Flask 主入口。初始化 DB、迁移、脑电接收器（若设备存在），注册路由，提供 /、/static/picture、/static/video 等。
+
+3.2 Web 路由（蓝图）
+   - account（登录注册）：/login, /register, /userinfo
+   - main（主页与历史）：/main, /history, /history/debug, /detail, /comprehensive-detail, /submit_success.html, /api/report-details/<id>, /logout
+   - test（测评与多模态）：/SDS, /SDS/submit, /SDS/submit_with_emotion, /test/process（语音）, /test/speech-status, /test/speech-test,
+     /emotion/detect, /emotion/statistics, /emotion/reset, /emotion/service-info, /emotion/video_stream, /emotion/stream_status, /emotion/stop_stream,
+     /eeg/latest, /eeg/channels, /eeg/classification, /eeg/history, /eeg-test, /eeg/stream
+   - psychological_counseling（咨询）：/api/chat（聊天）, /api/chat/health, /counseling（页面）, /api/counseling/latest-report, /api/counseling/history
+
+3.3 业务工具（utils）
+   - db.py：SQLite 连接与 WAL、userinfo/test 表初始化、fetch_one/fetch_all/insert/update 等。
+   - scoring_system.py：综合评分。根据 SDS 分、表情数据（及脑电）算综合分与抑郁等级，供 submit_with_emotion 使用。
+   - emollm_client.py：心理咨询 API 客户端。对接硅基流动（及可选 Tavily），实现 chat（含流式）、健康检查等。
+   - speech_recognition_dolphin.py：Dolphin ASR 语音识别，用于 SDS 语音答题（process_speech_for_sds、extract_answer_from_text 等）。
+   - emotion_recognition_gpu.py：GPU 版表情识别（ONNX），供 /emotion/* 等接口。
+   - emotion_recognition_npu.py：NPU 版表情识别，供 NPU 启动脚本。
+   - simple_mjpeg_stream_gpu.py：GPU 版 MJPEG 视频流（人脸检测+表情），供测评页视频与表情数据。
+   - simple_mjpeg_stream.py：简化版/CPU 版 MJPEG 流，NPU 版使用。
+   - flask_app/utils/eeg_receiver.py：脑电串口接收、3 通道数据与特征（theta/alpha/beta）、统计与情绪相关阈值，供 /eeg/* 及综合评分。
+
+3.4 配置
+   - .env：环境变量（不提交）。含 SILICONFLOW_API_KEY、SILICONFLOW_API_URL、SILICONFLOW_MODEL、TAVILY_API_KEY 等。
+   - .env.example：示例，复制为 .env 后填写。
+   - my_flask_app/config/emotion_config.yaml：表情识别与摄像头、NPU/GPU、日志等配置。
+
+3.5 数据库
+   - userinfo：id, name, mobile, password, email, real_name, sex, number, history, role
+   - test：id, role, choose（20 题答案串）, score, user_id, start_time, finish_time, use_time, status, result, emotion_data, comprehensive_score, comprehensive_result
+
+
+四、项目结构（目录与主要文件）
+================================================================================
+
+yiyuzhen_project/
+├── start_app_gpu.py                 # GPU 版启动入口
+├── start_app_npu.py                 # NPU 版启动入口
+├── 运行命令.txt                     # 常用运行命令备忘
+├── 项目说明.txt                     # 本说明文档
+├── .env                             # 环境变量（API Key 等，勿提交）
+├── .env.example                     # 环境变量模板
+├── .gitignore
+├── requirements_gpu.txt            # GPU 环境依赖
+├── requirements_npu_py39.txt       # NPU 环境依赖（Python 3.9）
+├── logs/                            # 各类日志
+│   ├── speech_recognition_dolphin.log
+│   ├── emotion_recognition_gpu.log
+│   ├── yiyuzhen.log
+│   ├── emollm.log
+│   └── ...
+├── models/                          # 模型文件（需自行准备或下载）
+│   ├── onnx_model_48.onnx           # GPU 表情识别
+│   ├── faceDetection.onnx / yolov8s.onnx  # 人脸检测
+│   └── （NPU 版为 .om 等）
+├── my_flask_app/
+│   ├── app.py                       # Flask 应用入口（被 start_*.py 导入）
+│   ├── config/
+│   │   └── emotion_config.yaml      # 表情识别配置
+│   ├── flask_app/
+│   │   ├── __init__.py              # 创建 app、加载 .env、注册蓝图、before_request 鉴权
+│   │   ├── views/
+│   │   │   ├── main.py              # 主页、历史、详情、报告、登出
+│   │   │   ├── account.py           # 登录、注册、个人信息
+│   │   │   ├── test.py             # SDS 测评、语音/表情/脑电接口
+│   │   │   └── psychological_counseling.py  # 咨询页与 /api/chat
+│   │   ├── utils/
+│   │   │   └── eeg_receiver.py      # 脑电接收与特征
+│   │   ├── templates/               # 页面模板
+│   │   │   ├── base.html
+│   │   │   ├── login2.html, register.html, userinfo.html
+│   │   │   ├── main2.html           # 主页
+│   │   │   ├── SDS_working2.html   # SDS 测评页（MJPEG+表情+语音）
+│   │   │   ├── submit_success.html
+│   │   │   ├── history.html
+│   │   │   ├── detail.html         # 仅 SDS 详情
+│   │   │   ├── comprehensive_detail.html  # 综合评分详情
+│   │   │   ├── counseling.html     # 心理咨询
+│   │   │   ├── eeg_test.html
+│   │   │   └── ...
+│   │   └── static/
+│   │       ├── js/                  # 如 emotion-recognition.js, enhanced-video-player.js
+│   │       ├── picture/, video/
+│   │       └── ...
+│   ├── utils/
+│   │   ├── db.py                    # 数据库
+│   │   ├── scoring_system.py        # 综合评分
+│   │   ├── emollm_client.py         # 心理咨询 API
+│   │   ├── speech_recognition_dolphin.py
+│   │   ├── emotion_recognition_gpu.py
+│   │   ├── emotion_recognition_npu.py
+│   │   ├── simple_mjpeg_stream_gpu.py
+│   │   ├── simple_mjpeg_stream.py
+│   │   └── db_migration_emotion.py  # 数据库迁移（表情等）
+│   ├── check_database.py            # 数据库检查
+│   ├── clean_database.py            # 清理脚本
+│   ├── diagnose_time.py             # 诊断/时间相关
+│   └── restart_server.py            # 重启服务脚本
+├── backup/                          # 备份目录
+└── 串口.py                          # 串口相关（如脑电）测试/工具
+
+说明：
+- 运行 start_app_gpu.py 或 start_app_npu.py 时，当前工作目录应为 yiyuzhen_project（项目根）。
+- 数据库文件 depression.db 会在 my_flask_app 目录下创建（db.py 中路径为相对 flask_app 的上级）。
+
+
+五、使用方法（部署与日常使用）
+================================================================================
+
+5.1 环境准备
+   - Python 3.9+（NPU 版建议按 requirements_npu_py39.txt 使用 3.9）
+   - GPU 版：NVIDIA 驱动 + CUDA，安装 requirements_gpu.txt（含 torch、onnxruntime-gpu、dataoceanai-dolphin 等）
+   - NPU 版：昇腾 CANN、对应 NPU 驱动，安装 requirements_npu_py39.txt
+   - 复制 .env.example 为 .env，填写 SILICONFLOW_API_KEY（必填），TAVILY_API_KEY（可选，用于联网搜索）
+
+5.2 模型与设备
+   - GPU：将 onnx_model_48.onnx、人脸检测 onnx 等放到项目根下 models/（或脚本中指定路径）
+   - NPU：将对应 .om 模型放到 models/，并在 emotion_config.yaml 中配置路径
+   - 脑电：串口设备（如 /dev/ttyUSB0），波特率 230400，eeg_receiver 在 app 启动时尝试初始化
+   - 摄像头：测评页需要时可接摄像头，MJPEG 流与表情识别会使用
+
+5.3 启动与访问
+   - conda activate depression
+   - cd /home/ZR/data2/Depression/yiyuzhen_project
+   - python3 start_app_gpu.py   # 或 start_app_npu.py
+   - 浏览器打开 http://本机IP:5000，默认账号 DSH/1
+
+5.4 仅 SDS 测评（不关心表情/脑电）
+   - 登录 → 进入测评 → 答 20 题 → 提交。前端若走 /SDS/submit 则只存 SDS 分数与等级。
+
+5.5 综合测评（SDS+表情+脑电）
+   - 确保表情服务、MJPEG、脑电（若用）已随 start_*.py 正常启动
+   - 测评页使用 SDS_working2.html，开启摄像头/语音，答完题后前端应调用 /SDS/submit_with_emotion 并传 answers、totalTime、emotionData 等
+   - 综合分与等级由 scoring_system 计算并写入 test 表
+
+5.6 心理咨询
+   - 进入 /counseling，输入消息发送。需 .env 中 SILICONFLOW_API_KEY 正确。
+   - 可选「带入最近测评报告」：后端从 test 表取该用户最近一次记录，通过 /api/report-details/<id> 或内部组装为报告上下文传给大模型。
+
+5.7 管理员
+   - 将 userinfo 中对应用户的 role 设为 2，则该用户在主列表/历史中可查看全部用户的测评记录。
+
+5.8 停止服务
+   - 在运行 start_app_*.py 的终端按 Ctrl+C，脚本会执行信号处理，释放语音、表情、MJPEG 等资源后退出。
+
+
+六、注意事项
+================================================================================
+
+- 首次运行会创建 SQLite 库表并执行迁移；默认用户 DSH 由 init_database 插入。
+- 表情/语音/脑电任一服务初始化失败时，系统会打印警告并尽量以降级方式继续（如仅问卷可用）。
+- 硅基流动 API 与 Tavily 的密钥不要提交到仓库，仅放在 .env 中。
+- SDS 反向题（2,5,6,11,12,14,16,17,18,20）在 submit 与 submit_with_emotion 中均按 4-原分 处理。
+- 综合评分权重可在 scoring_system.py 的 component_weights 中调整（SDS/表情/脑电比例）。
+- 日志位于 logs/，便于排查语音、表情、EmoLLM、脑电等问题。
+
+================================================================================
+文档结束。如有结构或代码变更，请以实际仓库为准并更新本说明。
+================================================================================

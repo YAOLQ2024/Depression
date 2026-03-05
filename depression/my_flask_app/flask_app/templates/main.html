@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}工作台 - SDS 测评系统{% endblock %}
+
+{% block breadcrumb %}
+<span class="font-medium text-textPrimary">仪表盘</span>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    
+    <!-- Greeting & Date -->
+    <div class="flex items-end justify-between">
+        <div>
+            <h2 class="text-2xl font-bold text-textPrimary">早安，{{ session.get('userinfo', {}).get('name', 'User') }}</h2>
+            <p class="text-textTertiary mt-1">今天感觉如何？记得给自己一点放松的时间。</p>
+        </div>
+        <div class="hidden md:block text-right">
+            <p class="text-sm font-medium text-[#165DFF]" id="current-date"></p>
+        </div>
+    </div>
+
+    <!-- Stats Cards Row -->
+    <div class="grid gap-6 md:grid-cols-3">
+        <!-- Card 1 -->
+        <div class="bg-white p-6 rounded-card border-none shadow-sm flex items-center justify-between">
+            <div class="space-y-1">
+                <p class="text-xs text-textTertiary">最近测评结果</p>
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl font-bold text-textPrimary">N/A</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] bg-[#FFF7E8] text-warning border border-[#FF7D00]/20">暂无</span>
+                </div>
+                <p class="text-xs text-textTertiary">2024-05-20</p>
+            </div>
+            <div class="h-10 w-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
+                <i class="fa-solid fa-activity text-lg"></i>
+            </div>
+        </div>
+        <!-- Card 2 -->
+        <div class="bg-white p-6 rounded-card border-none shadow-sm flex items-center justify-between">
+            <div class="space-y-1">
+                <p class="text-xs text-textTertiary">近 30 天测评</p>
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl font-bold text-textPrimary">0次</span>
+                </div>
+                <p class="text-xs text-textTertiary">保持定期关注</p>
+            </div>
+            <div class="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
+                <i class="fa-solid fa-calendar-days text-lg"></i>
+            </div>
+        </div>
+        <!-- Card 3 -->
+        <div class="bg-white p-6 rounded-card border-none shadow-sm flex items-center justify-between">
+            <div class="space-y-1">
+                <p class="text-xs text-textTertiary">距上次测评</p>
+                <div class="flex items-center gap-2">
+                    <span class="text-2xl font-bold text-textPrimary">--</span>
+                </div>
+                <p class="text-xs text-textTertiary">建议每周自测</p>
+            </div>
+            <div class="h-10 w-10 rounded-full bg-green-50 flex items-center justify-center text-green-500">
+                <i class="fa-solid fa-clock text-lg"></i>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Grid: Hero + Devices + Bottom Widgets -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Left Column (Span 2) -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Hero Card -->
+            <div class="relative overflow-hidden rounded-card bg-gradient-to-r from-blue-50 to-white shadow-sm h-64 flex flex-col justify-center px-8 cursor-pointer group transition-all hover:shadow-md border border-[#E5E8EF]" 
+                 onclick="location.href='{{ url_for('test.SDS') }}'">
+                <div class="relative z-10 max-w-lg">
+                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-blue-100 text-[#165DFF] text-xs font-bold mb-4">
+                        SDS 抑郁自评量表
+                    </div>
+                    <h3 class="text-3xl font-bold text-textPrimary mb-3">开始新的<br>心理健康测评</h3>
+                    <p class="text-textSecondary text-sm leading-relaxed mb-6 max-w-sm">
+                        包含 20 道标准问题，预计耗时 3-5 分钟。配合辅助采集功能，获取更深度的情绪分析。
+                    </p>
+                    <div class="flex items-center gap-3">
+                        <button class="px-5 py-2.5 bg-[#165DFF] hover:bg-[#165DFF]/90 text-white rounded-btn font-medium transition-all shadow-blue-500/20 shadow-md text-sm">
+                            开始测评 <i class="fa-solid fa-arrow-right ml-1"></i>
+                        </button>
+                        <a href="{{ url_for('main.history') }}" class="px-5 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 text-textSecondary rounded-btn font-medium transition-all text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-xs"></i> 历史记录
+                        </a>
+                    </div>
+                </div>
+                <!-- Decorative Image Placeholder -->
+                <div class="absolute right-0 top-0 bottom-0 w-1/2 bg-[url('https://images.unsplash.com/photo-1499209974431-9dddcece7f88?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80')] bg-cover bg-center opacity-20 mask-image-linear-gradient"></div>
+            </div>
+
+            <!-- Bottom Widgets: Reading & Quote -->
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Daily Reading -->
+                <div class="bg-white p-6 rounded-card shadow-sm border-none flex flex-col h-full">
+                    <div class="h-10 w-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-book-open"></i>
+                    </div>
+                    <h4 class="font-bold text-textPrimary mb-1">每日阅读</h4>
+                    <p class="text-xs text-textSecondary line-clamp-2 mb-3">《接纳承诺疗法：如何跳出思维的陷阱》- 这一章节讲述了如何与负面情绪共处...</p>
+                    <a href="#" class="text-[#165DFF] text-xs font-medium hover:underline mt-auto">继续阅读</a>
+                </div>
+                <!-- Daily Quote -->
+                <div class="bg-white p-6 rounded-card shadow-sm border-none flex flex-col h-full">
+                    <div class="h-10 w-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-quote-left"></i>
+                    </div>
+                    <h4 class="font-bold text-textPrimary mb-1">今日语录</h4>
+                    <p class="text-xs text-textSecondary italic">"情绪不是事实，它们只是流经你内心的天气。"</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column (Span 1) -->
+        <div class="lg:col-span-1 space-y-6">
+            
+            <!-- Auxiliary Devices Status -->
+            <div class="bg-white p-6 rounded-card shadow-sm border-none">
+                <div class="flex items-center gap-2 mb-1">
+                    <h3 class="font-bold text-textPrimary">辅助采集设备</h3>
+                    <span class="h-1.5 w-1.5 rounded-full bg-[#E5E8EF]"></span>
+                </div>
+                <p class="text-xs text-textTertiary mb-4">配置您的生物反馈设备</p>
+                
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-3 bg-[#F7F9FC] rounded-lg border border-[#E5E8EF]">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-video text-textTertiary"></i>
+                            <span class="text-sm font-medium text-textPrimary">摄像头</span>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-textTertiary border border-gray-200">未开启</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-[#F7F9FC] rounded-lg border border-[#E5E8EF]">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-microphone text-textTertiary"></i>
+                            <span class="text-sm font-medium text-textPrimary">麦克风</span>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-textTertiary border border-gray-200">未开启</span>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-[#F7F9FC] rounded-lg border border-[#E5E8EF]">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid fa-wave-square text-textTertiary"></i>
+                            <span class="text-sm font-medium text-textPrimary">EEG</span>
+                        </div>
+                        <span class="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-textTertiary border border-gray-200">未连接</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity List -->
+            <div class="bg-white p-6 rounded-card shadow-sm border-none flex flex-col" style="height: 382px;">
+                <h3 class="font-bold text-textPrimary mb-4 shrink-0">近期动态</h3>
+                <div class="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                    <div class="space-y-6 relative pl-2">
+                        <!-- Vertical Line -->
+                        <div class="absolute left-[7px] top-2 bottom-2 w-[1px] bg-[#E5E8EF]"></div>
+                        
+                        <!-- Item 1 -->
+                        <div class="relative flex gap-4">
+                            <div class="h-3.5 w-3.5 rounded-full border-2 border-[#165DFF] bg-white z-10 shrink-0 mt-0.5"></div>
+                            <div>
+                                <p class="text-sm font-medium text-textPrimary">查看了 5 月 20 日的综合报告</p>
+                                <p class="text-xs text-textTertiary mt-0.5">10 分钟前</p>
+                            </div>
+                        </div>
+                        <!-- Item 2 -->
+                        <div class="relative flex gap-4">
+                            <div class="h-3.5 w-3.5 rounded-full border-2 border-[#165DFF] bg-white z-10 shrink-0 mt-0.5"></div>
+                            <div>
+                                <p class="text-sm font-medium text-textPrimary">登录系统</p>
+                                <p class="text-xs text-textTertiary mt-0.5">1 小时前</p>
+                            </div>
+                        </div>
+                        <!-- Item 3 -->
+                        <div class="relative flex gap-4">
+                            <div class="h-3.5 w-3.5 rounded-full border-2 border-[#165DFF] bg-white z-10 shrink-0 mt-0.5"></div>
+                            <div>
+                                <p class="text-sm font-medium text-textPrimary">与 AI 助手进行了一次对话</p>
+                                <p class="text-xs text-textTertiary mt-0.5">昨天</p>
+                            </div>
+                        </div>
+                        <!-- Item 4 (示例，可删除) -->
+                        <div class="relative flex gap-4">
+                            <div class="h-3.5 w-3.5 rounded-full border-2 border-[#165DFF] bg-white z-10 shrink-0 mt-0.5"></div>
+                            <div>
+                                <p class="text-sm font-medium text-textPrimary">完成了一次 SDS 测评</p>
+                                <p class="text-xs text-textTertiary mt-0.5">2 天前</p>
+                            </div>
+                        </div>
+                        <!-- Item 5 (示例，可删除) -->
+                        <div class="relative flex gap-4">
+                            <div class="h-3.5 w-3.5 rounded-full border-2 border-[#165DFF] bg-white z-10 shrink-0 mt-0.5"></div>
+                            <div>
+                                <p class="text-sm font-medium text-textPrimary">更新了个人资料</p>
+                                <p class="text-xs text-textTertiary mt-0.5">3 天前</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Display current date
+    const dateEl = document.getElementById('current-date');
+    if (dateEl) {
+        const now = new Date();
+        const options = { month: 'long', day: 'numeric', weekday: 'long' };
+        dateEl.textContent = now.toLocaleDateString('zh-CN', options);
+    }
+</script>
+{% endblock %}

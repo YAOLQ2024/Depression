@@ -1,0 +1,1073 @@
+{% extends "base.html" %}
+
+{% block title %}测评进行中 - SDS 抑郁自评与辅助分析系统{% endblock %}
+
+{% block breadcrumb %}{% endblock %}
+
+{% block content %}
+<style>
+    .bg-noise-sds {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none; z-index: 50; opacity: 0.03;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulance type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+    }
+
+    .glass-panel {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.85) 100%);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .ambient-sphere { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }
+    
+    .pattern-dots {
+        background-image: radial-gradient(#94A3B8 1px, transparent 1px);
+        background-size: 20px 20px;
+        opacity: 0.15;
+        position: absolute; inset: 0; pointer-events: none; z-index: 0;
+    }
+
+    .dynamic-bubble {
+        position: fixed; border-radius: 50%; pointer-events: none; z-index: 1;
+    }
+
+    .voice-bar {
+        width: 4px;
+        background-color: #3B82F6;
+        border-radius: 2px;
+        animation: wave 1s ease-in-out infinite;
+    }
+    .voice-bar:nth-child(odd) { animation-duration: 0.8s; background-color: #60A5FA; }
+    .voice-bar:nth-child(2n) { animation-duration: 1.1s; }
+    .voice-bar:nth-child(3n) { animation-duration: 1.3s; background-color: #93C5FD; }
+
+    .scan-line {
+        position: absolute; left: 0; width: 100%; height: 2px;
+        background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.8), transparent);
+        box-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
+        animation: scan 3s linear infinite;
+    }
+
+    .inner-bubble {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        filter: blur(3px);
+    }
+
+    @keyframes meander {
+        0%, 100% { transform: translate(0, 0); }
+        25% { transform: translate(150px, -150px); }
+        50% { transform: translate(-90px, 210px); }
+        75% { transform: translate(-210px, -90px); }
+    }
+    @keyframes meander-reverse {
+        0%, 100% { transform: translate(0, 0); }
+        25% { transform: translate(-150px, 150px); }
+        50% { transform: translate(90px, -210px); }
+        75% { transform: translate(210px, 90px); }
+    }
+    @keyframes meander-fast {
+        0%, 100% { transform: translate(0, 0); }
+        25% { transform: translate(120px, -120px); }
+        50% { transform: translate(-70px, 170px); }
+        75% { transform: translate(-170px, -70px); }
+    }
+    @keyframes meander-slow {
+        0%, 100% { transform: translate(0, 0); }
+        25% { transform: translate(180px, -180px); }
+        50% { transform: translate(-110px, 250px); }
+        75% { transform: translate(-250px, -110px); }
+    }
+    @keyframes wave {
+        0%, 100% { height: 8px; }
+        50% { height: 24px; }
+    }
+    @keyframes scan {
+        0% { top: 0%; opacity: 0; }
+        10% { opacity: 1; }
+        90% { opacity: 1; }
+        100% { top: 100%; opacity: 0; }
+    }
+    @keyframes cursor {
+        0%, 100% { opacity: 1 }
+        50% { opacity: 0 }
+    }
+    .animate-meander { animation: meander 5s ease-in-out infinite; }
+    .animate-meander-fast { animation: meander-fast 3.3s ease-in-out infinite; }
+    .animate-meander-reverse { animation: meander-reverse 6s ease-in-out infinite; }
+    .animate-meander-slow { animation: meander-slow 7s ease-in-out infinite; }
+    .animate-cursor { animation: cursor 1s step-end infinite; }
+</style>
+
+<div class="relative m-0" x-data="sdsAssessment()">
+    <div class="bg-noise-sds"></div>
+    
+    <!-- 背景光斑和泡泡 -->
+    <div class="ambient-sphere w-[600px] h-[600px] -top-32 -left-32 bg-blue-100/40 blur-[80px] animate-float-slow fixed"></div>
+    <div class="ambient-sphere w-[500px] h-[500px] top-0 -right-20 bg-orange-50/40 animate-float fixed"></div>
+    <div class="ambient-sphere w-[400px] h-[400px] bottom-0 left-1/3 bg-indigo-50/30 animate-float-slow fixed"></div>
+    <div id="bubble-container" class="fixed inset-0 pointer-events-none overflow-hidden z-0"></div>
+
+    <!-- SDS 顶部进度栏 -->
+    <header class="relative z-50 bg-white/30 backdrop-blur-sm border-b border-white/40 px-6 py-4 -mx-4 sm:-mx-6 lg:-mx-8 mb-6">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <h1 class="font-bold text-slate-800 text-lg leading-none tracking-tight">SDS 测评</h1>
+                    <p class="text-[10px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">Assessment in Progress</p>
+                </div>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="flex-1 max-w-xl mx-8 hidden md:block group">
+                <div class="flex justify-between text-xs font-semibold text-slate-500 mb-2">
+                    <span class="group-hover:text-blue-600 transition-colors">测评进度</span>
+                    <span class="text-blue-600 font-mono" x-text="String(currentQuestionIndex + 1).padStart(2, '0') + ' / 20'">01 / 20</span>
+                </div>
+                <div class="w-full bg-slate-200/60 h-2 rounded-full overflow-hidden backdrop-blur-sm">
+                    <div class="bg-gradient-to-r from-blue-400 to-indigo-500 h-2 rounded-full transition-all duration-700 ease-out shadow-[0_0_12px_rgba(59,130,246,0.6)] relative" :style="'width: ' + ((currentQuestionIndex + 1) / 20 * 100) + '%'">
+                        <div class="absolute right-0 top-0 h-2 w-2 bg-white rounded-full opacity-50 animate-pulse"></div>
+                    </div>
+                </div>
+            </div>
+
+            <a href="{{ url_for('main.main') }}" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/60 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-all text-sm font-semibold shadow-sm hover:shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                暂存退出
+            </a>
+        </div>
+    </header>
+
+    <!-- 主体内容区 -->
+    <main class="relative z-10 w-full px-[30px] pb-8">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-start" x-data="{ leftHeight: 0 }" x-init="$nextTick(() => { leftHeight = $refs.leftSection.offsetHeight })">
+            
+            <!-- 左侧：答题区 + 下方小卡片 -->
+            <section class="lg:col-span-8 xl:col-span-9 relative min-w-0 flex flex-col gap-6" x-ref="leftSection">
+                <form id="sds-form" action="{{ url_for('test.SDS_submit') }}" method="POST" class="h-full">
+                    <div class="glass-panel rounded-[32px] p-8 md:p-12 xl:p-14 shadow-card relative flex flex-col h-full">
+                        <div class="pattern-dots"></div>
+                        
+                        <!-- 卡片内氛围泡泡 -->
+                        <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                            <div class="inner-bubble w-72 h-72 -top-20 -right-20 bg-orange-100/50 animate-meander blur-md"></div>
+                            <div class="inner-bubble w-56 h-56 bottom-0 left-20 bg-blue-100/40 animate-meander-reverse blur-none"></div>
+                            <div class="inner-bubble w-40 h-40 top-1/2 right-1/3 bg-indigo-100/45 animate-float opacity-70 blur-sm"></div>
+                            <div class="inner-bubble w-64 h-64 top-10 left-10 bg-rose-100/35 animate-meander-fast blur-xl"></div>
+                            <div class="inner-bubble w-32 h-32 bottom-20 right-1/4 bg-teal-100/40 animate-meander-slow blur-none"></div>
+                            <div class="inner-bubble w-48 h-48 top-1/3 left-1/2 bg-purple-100/30 animate-meander-reverse blur-lg"></div>
+                            <div class="inner-bubble w-28 h-28 bottom-1/3 left-1/4 bg-amber-100/45 animate-float-slow blur-sm"></div>
+                            <div class="inner-bubble w-52 h-52 top-20 right-1/2 bg-cyan-100/35 animate-meander blur-none"></div>
+                            <div class="inner-bubble w-36 h-36 bottom-10 right-10 bg-lime-100/40 animate-meander-fast blur-lg"></div>
+                            <div class="inner-bubble w-44 h-44 top-1/4 left-1/3 bg-fuchsia-100/30 animate-float-reverse blur-xl"></div>
+                            <div class="inner-bubble w-24 h-24 top-2/3 right-1/4 bg-emerald-100/50 animate-meander-reverse blur-none"></div>
+                            <div class="inner-bubble w-60 h-60 bottom-1/4 left-1/2 bg-pink-100/35 animate-meander-slow blur-md"></div>
+                            <div class="inner-bubble w-20 h-20 top-1/2 left-1/4 bg-sky-100/45 animate-float blur-lg"></div>
+                        </div>
+                        
+                        <!-- 装饰 -->
+                        <div class="absolute top-8 left-8 text-blue-100/50 font-serif text-[120px] leading-none select-none pointer-events-none -translate-y-8 -translate-x-4">"</div>
+
+                        <!-- 题目内容区 -->
+                        <div class="relative z-10 flex-grow flex items-center gap-8 xl:gap-16">
+                            
+                            <!-- 答题区 -->
+                            <div class="flex-1 flex flex-col justify-center xl:pr-8">
+                                <div class="mb-8 relative">
+                                    <div class="flex items-center gap-4 mb-6">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold tracking-wider shadow-sm">
+                                            <span class="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
+                                            <span x-text="'QUESTION ' + String(currentQuestionIndex + 1).padStart(2, '0')">QUESTION 01</span>
+                                        </span>
+                                        <div class="h-px flex-grow bg-gradient-to-r from-blue-100 to-transparent"></div>
+                                    </div>
+                                    
+                                    <h2 class="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-800 leading-tight relative" x-text="(currentQuestionIndex + 1) + '. ' + questions[currentQuestionIndex].text">
+                                        1. 我觉得闷闷不乐，情绪低沉
+                                    </h2>
+                                </div>
+
+                                <!-- 选项组 -->
+                                <div class="grid grid-cols-1 gap-4 w-full">
+                                    <template x-for="(option, idx) in options" :key="idx">
+                                        <button type="button" @click="selectAnswer(option.value)"
+                                            :class="{
+                                                'border-blue-400 bg-blue-50/50 shadow-md': answers[currentQuestionIndex] === option.value,
+                                                'border-slate-200 bg-white/60': answers[currentQuestionIndex] !== option.value
+                                            }"
+                                            class="relative flex items-center p-5 rounded-2xl border hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md cursor-pointer transition-all duration-200 group">
+                                            <div class="w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center transition-all group-hover:scale-110 shrink-0"
+                                                :class="{ 'border-blue-500 bg-blue-500': answers[currentQuestionIndex] === option.value }">
+                                                <svg class="w-3 h-3 text-white" :class="{ 'hidden': answers[currentQuestionIndex] !== option.value }" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                            </div>
+                                            <span class="ml-3 font-serif font-bold text-slate-400 text-xl group-hover:text-blue-500 transition-colors"
+                                                :class="{ 'text-blue-600': answers[currentQuestionIndex] === option.value }"
+                                                x-text="String.fromCharCode(65 + idx) + '.'">A.</span>
+                                            <span class="ml-2 text-base lg:text-lg text-slate-600 font-medium group-hover:text-slate-800 transition-colors"
+                                                :class="{ 'text-blue-700': answers[currentQuestionIndex] === option.value }"
+                                                x-text="option.label">没有或很少时间</span>
+                                            <div class="absolute inset-0 bg-blue-500/5 rounded-2xl opacity-0 transition-opacity pointer-events-none"
+                                                :class="{ 'opacity-100': answers[currentQuestionIndex] === option.value }"></div>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- 右侧：题目视频 -->
+                            <div class="hidden xl:flex flex-1 items-center justify-center h-full overflow-hidden relative px-4">
+                                <div class="w-full h-full max-w-full max-h-full bg-black rounded-2xl border-2 border-slate-200/30 relative overflow-hidden shadow-xl">
+                                    <video id="question-video" class="w-full h-full object-cover" autoplay playsinline>
+                                        <source src="/static/video/1.mp4" type="video/mp4" id="video-source">
+                                        您的浏览器不支持视频播放
+                                    </video>
+                                    <!-- 播放按钮（当视频需要用户交互时显示） -->
+                                    <button id="video-play-btn" type="button" class="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity z-20 hidden">
+                                        <div class="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-800 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                        </div>
+                                    </button>
+                                    <div class="absolute top-3 left-3 px-3 py-1 bg-black/60 backdrop-blur-md rounded-lg text-xs text-white/90 border border-white/20 flex items-center gap-2 z-10">
+                                        <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                                        <span>题目演示</span>
+                                    </div>
+                                    <div class="absolute bottom-3 right-3 px-3 py-1 bg-black/60 backdrop-blur-md rounded-lg text-xs text-white/90 border border-white/20 font-mono z-10">
+                                        <span id="video-question-number">Q01</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <!-- 底部交互栏 -->
+                        <div class="relative z-10 mt-auto border-t border-slate-200/50 pt-6">
+                            <div class="flex flex-col xl:flex-row items-center gap-5">
+                                
+                                <!-- Voice Button -->
+                                <div @click="startVoiceRecording" class="flex items-center gap-4 shrink-0 p-1.5 pr-5 rounded-full border shadow-sm backdrop-blur-md transition-all cursor-pointer group/voice"
+                                    :class="isRecording ? 'bg-rose-50 border-rose-300 hover:bg-rose-100' : 'bg-white/40 border-white/60 hover:bg-white/60'">
+                                    <button type="button" class="w-11 h-11 rounded-full bg-gradient-to-r text-white flex items-center justify-center shadow-lg transition-all"
+                                        :class="isRecording ? 'from-red-500 to-rose-600 animate-pulse scale-110' : 'from-rose-400 to-orange-400 group-hover/voice:scale-105'">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                                    </button>
+                                    <div class="flex flex-col">
+                                        <span class="text-[10px] font-bold uppercase tracking-wider transition-colors"
+                                            :class="isRecording ? 'text-rose-600' : 'text-slate-500 group-hover/voice:text-rose-500'">
+                                            <span x-show="!isRecording">Voice Answer</span>
+                                            <span x-show="isRecording">Recording...</span>
+                                        </span>
+                                        <div class="flex items-end gap-0.5 h-3 mt-0.5" x-show="isRecording">
+                                            <div class="voice-bar h-1.5 w-0.5"></div>
+                                            <div class="voice-bar h-2.5 w-0.5"></div>
+                                            <div class="voice-bar h-3 w-0.5"></div>
+                                            <div class="voice-bar h-1.5 w-0.5"></div>
+                                            <span class="text-[10px] text-slate-400 ml-1.5 font-medium">Listening...</span>
+                                        </div>
+                                        <div x-show="!isRecording" class="text-[9px] text-slate-400 mt-0.5">
+                                            点击开始
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Transcript (Middle) -->
+                                <div class="w-full xl:flex-1 border rounded-xl p-3 flex items-center gap-3 shadow-inner-text group transition-all min-h-[60px]"
+                                    :class="isRecording ? 'bg-rose-50/70 border-rose-200' : 'bg-slate-50/50 border-slate-200/60 hover:bg-white/60'">
+                                     <div class="shrink-0 flex items-center gap-2">
+                                         <span class="flex h-1.5 w-1.5 rounded-full"
+                                            :class="isRecording ? 'bg-rose-500 animate-pulse' : 'bg-slate-400'"></span>
+                                         <span class="text-[10px] font-bold uppercase tracking-wider hidden sm:block"
+                                            :class="isRecording ? 'text-rose-500' : 'text-slate-400'">Transcript</span>
+                                     </div>
+                                     <p class="text-sm leading-relaxed border-l-2 pl-3 font-medium line-clamp-2 w-full transition-colors"
+                                        :class="isRecording ? 'text-rose-700 border-rose-300' : 'text-slate-600 border-slate-200'">
+                                         <span class="text-slate-300 italic mr-1">"</span>
+                                         <span x-text="transcriptText">语音识别结果将在这里显示...</span>
+                                         <span x-show="isRecording" class="inline-block w-1 h-3 align-middle bg-slate-400 ml-0.5 animate-cursor"></span>
+                                     </p>
+                                </div>
+
+                                <!-- Navigation Buttons -->
+                                <div class="flex gap-3 w-full xl:w-auto justify-between xl:justify-start ml-auto">
+                                    <button type="button" @click="prevQuestion" :disabled="currentQuestionIndex === 0"
+                                        class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white/50 text-slate-500 font-semibold hover:bg-white hover:text-slate-700 transition-all shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                        上一题
+                                    </button>
+                                    <button type="button" x-show="currentQuestionIndex < 19" @click="nextQuestion"
+                                        class="px-6 py-2.5 rounded-xl bg-slate-900 text-white font-semibold shadow-lg hover:bg-slate-800 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm">
+                                        下一题
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                                    </button>
+                                    <button type="button" x-show="currentQuestionIndex === 19" @click="submitAssessment"
+                                        class="px-6 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm">
+                                        提交问卷
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden inputs for answers -->
+                    <template x-for="(ans, idx) in answers" :key="idx">
+                        <input type="hidden" :name="'question' + (idx + 1)" :value="ans">
+                    </template>
+                </form>
+
+                <!-- 下方填充卡片 -->
+                <div class="grid grid-cols-2 gap-6">
+                    <!-- 提示卡片 -->
+                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden hover:shadow-lg transition-all duration-300">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-100/40 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
+                        <div class="relative z-10">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="p-2 rounded-lg bg-blue-50 text-blue-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </div>
+                                <h3 class="font-bold text-slate-700 text-sm">答题提示</h3>
+                            </div>
+                            <p class="text-xs text-slate-600 leading-relaxed">请根据最近一周的真实感受作答。没有对错之分，选择最符合您情况的选项即可。</p>
+                        </div>
+                    </div>
+
+                    <!-- 进度卡片 -->
+                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden hover:shadow-lg transition-all duration-300">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-100/40 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
+                        <div class="relative z-10">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="p-2 rounded-lg bg-green-50 text-green-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                </div>
+                                <h3 class="font-bold text-slate-700 text-sm">答题进度</h3>
+                            </div>
+                            <div class="flex items-baseline gap-2">
+                                <span class="text-2xl font-bold text-green-600" x-text="answers.filter(a => a !== null).length">0</span>
+                                <span class="text-sm text-slate-500">/ 20 题</span>
+                                <span class="ml-auto text-xs text-green-600 font-semibold" x-text="Math.round((answers.filter(a => a !== null).length / 20) * 100) + '%'">0%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 右侧：多模态监测 -->
+            <aside class="lg:col-span-4 xl:col-span-3 relative z-20 overflow-hidden">
+                <div class="h-full overflow-y-auto pr-2 flex flex-col gap-5" :style="'max-height: ' + leftHeight + 'px'">
+
+                <!-- 摄像头 -->
+                <div class="glass-panel rounded-2xl p-4 overflow-hidden relative hover:shadow-lg transition-all duration-500 shrink-0">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="relative flex h-2.5 w-2.5">
+                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                              <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                            </span>
+                            <span class="text-xs font-bold text-slate-600">Live Monitoring</span>
+                        </div>
+                        <span class="text-[10px] text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100 font-mono">Recording</span>
+                    </div>
+                    
+                    <div class="w-full aspect-video bg-slate-800 rounded-xl relative overflow-hidden">
+                        <div class="absolute top-3 left-3 z-10 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-2">
+                            <div class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>
+                            <span class="text-[10px] text-white/90 font-medium tracking-wide">REC</span>
+                        </div>
+                        <video id="video-preview" autoplay playsinline class="w-full h-full object-cover" style="transform: scaleX(-1);"></video>
+                        <canvas id="video-canvas" style="display: none;"></canvas>
+                        <div class="scan-line"></div>
+                        <div class="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-500/80 backdrop-blur-sm rounded-full text-[10px] text-white font-mono shadow-lg" id="emotion-label">
+                            检测中...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EEG -->
+                <div class="glass-panel rounded-2xl p-5 relative hover:shadow-lg transition-all duration-300 flex flex-col shrink-0">
+                    <div class="flex justify-between items-center mb-3 shrink-0">
+                        <div class="flex items-center gap-2">
+                            <div class="p-1.5 rounded-lg bg-indigo-50 text-indigo-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600">Multi-Channel EEG</span>
+                        </div>
+                        <span class="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100 font-mono">Stable</span>
+                    </div>
+                    
+                    <!-- EEG Channels - 高度增大二分之一 (60px -> 90px) -->
+                    <div class="w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner mb-2" style="height: 90px;">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">FP1</div>
+                        <canvas id="eegCanvas1" class="w-full h-full"></canvas>
+                    </div>
+                    
+                    <div class="w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner mb-2" style="height: 90px;">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">FP2</div>
+                        <canvas id="eegCanvas2" class="w-full h-full"></canvas>
+                    </div>
+
+                    <div class="w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner" style="height: 90px;">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">CZ</div>
+                        <canvas id="eegCanvas3" class="w-full h-full"></canvas>
+                    </div>
+                </div>
+
+                <!-- 答题卡 -->
+                <div class="glass-panel rounded-2xl p-4 relative hover:shadow-lg transition-all duration-300 shrink-0">
+                    <div class="flex justify-between items-center mb-3 shrink-0">
+                        <div class="flex items-center gap-2">
+                            <div class="p-1.5 rounded-lg bg-blue-50 text-blue-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600">答题卡</span>
+                        </div>
+                        <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 font-mono" x-text="answers.filter(a => a !== null).length + ' / 20'">0 / 20</span>
+                    </div>
+                    
+                    <!-- 题目网格 -->
+                    <div class="grid grid-cols-5 gap-1.5">
+                        <template x-for="(answer, idx) in answers" :key="idx">
+                            <button type="button" @click="currentQuestionIndex = idx; window.scrollTo({ top: 0, behavior: 'smooth' });"
+                                :class="{
+                                    'bg-blue-500 text-white border-blue-600 shadow-md': answer !== null && currentQuestionIndex !== idx,
+                                    'bg-indigo-600 text-white border-indigo-700 shadow-lg ring-2 ring-indigo-400 ring-offset-2 scale-105': currentQuestionIndex === idx && answer !== null,
+                                    'bg-indigo-100 text-indigo-700 border-indigo-400 shadow-md ring-2 ring-indigo-300 ring-offset-2 scale-105': currentQuestionIndex === idx && answer === null,
+                                    'bg-white/60 text-slate-400 border-slate-200 hover:border-blue-300 hover:bg-blue-50': answer === null && currentQuestionIndex !== idx
+                                }"
+                                class="aspect-square rounded-lg border-2 font-bold text-[10px] transition-all duration-200 hover:scale-110 flex items-center justify-center relative"
+                                :title="'第 ' + (idx + 1) + ' 题' + (answer !== null ? ' (已答)' : ' (未答)')">
+                                <span x-text="idx + 1"></span>
+                                <div x-show="answer !== null && currentQuestionIndex !== idx" class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                </div>
+            </aside>
+
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('sdsAssessment', () => ({
+        currentQuestionIndex: 0,
+        answers: Array(20).fill(null),
+        videoStream: null,
+        isRecording: false,
+        recognition: null,
+        transcriptText: '语音识别结果将在这里显示...',
+        
+        questions: [
+            { text: "我觉得闷闷不乐，情绪低沉" },
+            { text: "我觉得一天之中早晨最好" },
+            { text: "我一阵阵哭出来或觉得想哭" },
+            { text: "我晚上睡眠不好" },
+            { text: "我吃得跟平常一样多" },
+            { text: "我与异性亲密接触时和以往一样感到愉快" },
+            { text: "我发觉我的体重在下降" },
+            { text: "我有便秘的苦恼" },
+            { text: "心跳比平时快" },
+            { text: "我无缘无故地感到疲乏" },
+            { text: "我的头脑跟平常一样清楚" },
+            { text: "我觉得做常常做的事并没有困难" },
+            { text: "我觉得不安而平静不下来" },
+            { text: "我对将来抱有希望" },
+            { text: "我比平常容易生气激动" },
+            { text: "我觉得作出决定是容易的" },
+            { text: "我觉得自己是个有用的人，有人需要我" },
+            { text: "我的生活过得很有意思" },
+            { text: "我认为如果我死了，别人会过得更好些" },
+            { text: "平常感兴趣的事我仍然照样感兴趣" }
+        ],
+        
+        options: [
+            { value: "1", label: "没有或很少时间" },
+            { value: "2", label: "小部分时间" },
+            { value: "3", label: "相当多时间" },
+            { value: "4", label: "绝大部分或全部时间" }
+        ],
+
+        init() {
+            // 记录开始时间
+            this.startTime = Date.now();
+            
+            // 设置视频播放按钮点击事件
+            const playBtn = document.getElementById('video-play-btn');
+            const video = document.getElementById('question-video');
+            if (playBtn && video) {
+                playBtn.addEventListener('click', () => {
+                    video.play().catch(err => {
+                        console.error('播放视频失败:', err);
+                    });
+                });
+            }
+            
+            // 立即执行不阻塞的初始化
+            this.playQuestionVideo(); // 播放第一题视频
+            
+            // 使用 requestIdleCallback 在浏览器空闲时初始化，避免阻塞渲染
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(() => {
+                    this.createBubbles();
+                    this.initSpeechRecognition();
+                }, { timeout: 500 });
+                
+                requestIdleCallback(() => {
+                    this.initCamera();
+                    this.initEEG();
+                }, { timeout: 1500 });
+                
+                requestIdleCallback(() => {
+                    this.initEmotionDetection();
+                }, { timeout: 3000 });
+            } else {
+                // 降级方案：使用 setTimeout，延迟更长以避免阻塞
+                setTimeout(() => {
+                    this.createBubbles();
+                    this.initSpeechRecognition();
+                }, 200);
+                
+                setTimeout(() => {
+                    this.initCamera();
+                    this.initEEG();
+                }, 800);
+                
+                setTimeout(() => {
+                    this.initEmotionDetection();
+                }, 2000);
+            }
+        },
+        
+        playQuestionVideo() {
+            const video = document.getElementById('question-video');
+            const videoSource = document.getElementById('video-source');
+            const questionNumber = document.getElementById('video-question-number');
+            const playBtn = document.getElementById('video-play-btn');
+            
+            if (video && videoSource) {
+                // 更新题号显示
+                if (questionNumber) {
+                    questionNumber.textContent = 'Q' + String(this.currentQuestionIndex + 1).padStart(2, '0');
+                }
+                
+                // 更新视频源
+                videoSource.src = `/static/video/${this.currentQuestionIndex + 1}.mp4`;
+                video.load();
+                
+                // 隐藏播放按钮
+                if (playBtn) {
+                    playBtn.classList.add('hidden');
+                }
+                
+                // 延迟播放以确保加载完成
+                setTimeout(() => {
+                    video.play().catch(err => {
+                        console.log('视频自动播放失败（需要用户交互）:', err);
+                        // 如果自动播放失败（通常是因为浏览器策略要求用户交互），显示播放按钮
+                        if (playBtn) {
+                            playBtn.classList.remove('hidden');
+                        }
+                    });
+                }, 200);
+                
+                // 监听视频播放状态，播放时隐藏按钮
+                video.addEventListener('play', () => {
+                    if (playBtn) {
+                        playBtn.classList.add('hidden');
+                    }
+                });
+                
+                // 监听视频暂停状态，暂停时显示按钮
+                video.addEventListener('pause', () => {
+                    if (playBtn && video.readyState >= 2) { // 确保视频已加载
+                        playBtn.classList.remove('hidden');
+                    }
+                });
+            }
+        },
+
+        async initCamera() {
+            try {
+                // 请求浏览器摄像头权限
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: 'user' 
+                    } 
+                });
+                
+                const videoElement = document.getElementById('video-preview');
+                if (videoElement) {
+                    videoElement.srcObject = stream;
+                    console.log('✓ 摄像头已授权并启动');
+                }
+            } catch (error) {
+                console.error('摄像头权限被拒绝或无法访问:', error);
+                const labelElement = document.getElementById('emotion-label');
+                if (labelElement) {
+                    labelElement.textContent = '摄像头未授权';
+                }
+            }
+        },
+
+        initEmotionDetection() {
+            const videoElement = document.getElementById('video-preview');
+            const canvas = document.getElementById('video-canvas');
+            const ctx = canvas.getContext('2d');
+            const labelElement = document.getElementById('emotion-label');
+            
+            if (!videoElement || !canvas || !ctx) return;
+            
+            // 设置canvas尺寸
+            videoElement.addEventListener('loadedmetadata', () => {
+                canvas.width = videoElement.videoWidth || 640;
+                canvas.height = videoElement.videoHeight || 480;
+            });
+            
+            // 定期捕获视频帧并发送到服务器
+            const captureAndDetect = async () => {
+                try {
+                    // 检查视频是否就绪
+                    if (videoElement.readyState !== videoElement.HAVE_ENOUGH_DATA) {
+                        return;
+                    }
+                    
+                    // 捕获当前帧
+                    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
+                    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                    // 移除 data:image/jpeg;base64, 前缀，只保留base64数据
+                    const base64Data = imageData.split(',')[1] || imageData;
+                    
+                    // 发送到服务器进行表情识别
+                    const response = await fetch('/emotion/detect', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ image: base64Data })
+                    });
+                    
+                    const data = await response.json();
+                    console.log('表情检测响应:', data); // 调试日志
+                    
+                    if (data.success) {
+                        // 后端返回格式: { success: true, dominant_emotion: 'neutral', confidence: 0.537, ... }
+                        const emotion = data.dominant_emotion || 'neutral';
+                        const confidence = Math.round((data.confidence || 0) * 100);
+                        
+                        const emotionMap = {
+                            'happy': '开心',
+                            'Happy': '开心',
+                            'sad': '悲伤',
+                            'Sad': '悲伤',
+                            'angry': '愤怒',
+                            'Angry': '愤怒',
+                            'surprised': '惊讶',
+                            'Surprise': '惊讶',
+                            'fearful': '恐惧',
+                            'Fear': '恐惧',
+                            'disgusted': '厌恶',
+                            'Disgust': '厌恶',
+                            'neutral': '中性',
+                            'Neutral': '中性'
+                        };
+                        
+                        if (labelElement) {
+                            const emotionText = emotionMap[emotion] || emotion;
+                            labelElement.textContent = `${emotionText}: ${confidence}%`;
+                        }
+                    } else {
+                        console.error('表情检测失败:', data.error || '未知错误');
+                        if (labelElement) {
+                            labelElement.textContent = '检测失败';
+                        }
+                    }
+                } catch (error) {
+                    console.error('表情检测请求失败:', error);
+                    if (labelElement) {
+                        labelElement.textContent = '网络错误';
+                    }
+                }
+            };
+            
+            // 每500ms捕获一次（2fps，减少服务器负载）
+            setInterval(captureAndDetect, 500);
+        },
+        
+        selectAnswer(value) {
+            this.answers[this.currentQuestionIndex] = value;
+            if (this.currentQuestionIndex < 19) {
+                setTimeout(() => this.nextQuestion(), 200);
+            }
+        },
+        
+        nextQuestion() {
+            if (this.currentQuestionIndex < 19) {
+                this.currentQuestionIndex++;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                this.playQuestionVideo();
+            }
+        },
+        
+        prevQuestion() {
+            if (this.currentQuestionIndex > 0) {
+                this.currentQuestionIndex--;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                this.playQuestionVideo();
+            }
+        },
+        
+        async submitAssessment() {
+            const unanswered = this.answers.findIndex(a => a === null);
+            if (unanswered !== -1) {
+                alert(`请先完成所有题目，第 ${unanswered + 1} 题未作答。`);
+                this.currentQuestionIndex = unanswered;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                return;
+            }
+            
+            // 转换answers数组为对象格式
+            const answersObj = {};
+            this.answers.forEach((answer, index) => {
+                if (answer !== null) {
+                    answersObj[index + 1] = {
+                        value: parseInt(answer),
+                        option: String.fromCharCode(64 + parseInt(answer)) // 1->A, 2->B, 3->C, 4->D
+                    };
+                }
+            });
+            
+            // 计算总用时（秒）
+            const totalTime = Math.floor((Date.now() - this.startTime) / 1000);
+            
+            try {
+                const response = await fetch('/SDS/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        answers: answersObj,
+                        totalTime: totalTime
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 跳转到提交成功页面，传递record_id
+                    const recordId = data.record_id || data.test_id;
+                    if (recordId) {
+                        window.location.href = `/submit_success.html?record_id=${recordId}`;
+                    } else {
+                        // 如果没有record_id，使用redirect字段或默认跳转到历史记录
+                        window.location.href = data.redirect || '/history';
+                    }
+                } else {
+                    alert(data.error || '提交失败，请重试');
+                }
+            } catch (error) {
+                console.error('提交错误:', error);
+                alert('提交失败，请检查网络连接');
+            }
+        },
+        
+        startTime: Date.now(),
+
+        initEEG() {
+            const canvases = [
+                document.getElementById('eegCanvas1'),
+                document.getElementById('eegCanvas2'),
+                document.getElementById('eegCanvas3')
+            ];
+            const ctxs = canvases.map(c => c ? c.getContext('2d') : null).filter(c => c);
+            const channelNames = ['FP1', 'FP2', 'CZ'];
+            
+            // 存储波形数据
+            const waveforms = [[], [], []];
+            const maxPoints = 200; // 保留最近200个数据点
+            
+            function resizeCanvases() {
+                canvases.forEach(canvas => {
+                    if(canvas && canvas.parentElement) {
+                        canvas.width = canvas.parentElement.offsetWidth;
+                        canvas.height = canvas.parentElement.offsetHeight;
+                    }
+                });
+            }
+            window.addEventListener('resize', resizeCanvases);
+            setTimeout(resizeCanvases, 100);
+
+            // 从后端获取EEG数据
+            const fetchEEGData = async () => {
+                try {
+                    const response = await fetch('/eeg/channels');
+                    const data = await response.json();
+                    if (data.success && data.data) {
+                        // 更新三个通道的数据
+                        for (let i = 0; i < 3; i++) {
+                            const channelKey = `channel${i + 1}`;
+                            if (data.data[channelKey] && data.data[channelKey].waveform) {
+                                const newPoints = data.data[channelKey].waveform.slice(-10); // 取最后10个点
+                                waveforms[i].push(...newPoints);
+                                // 保持最大点数
+                                if (waveforms[i].length > maxPoints) {
+                                    waveforms[i] = waveforms[i].slice(-maxPoints);
+                                }
+                                
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('获取EEG数据失败:', error);
+                }
+            };
+            
+            // 每100ms获取一次数据
+            setInterval(fetchEEGData, 100);
+            fetchEEGData();
+            
+            function drawEEG() {
+                ctxs.forEach((ctx, index) => {
+                    if(!ctx) return;
+                    const canvas = canvases[index];
+                    const width = canvas.width;
+                    const height = canvas.height;
+                    
+                    ctx.clearRect(0, 0, width, height);
+                    
+                    if (waveforms[index].length === 0) {
+                        // 没有数据时显示占位
+                        ctx.fillStyle = '#94A3B8';
+                        ctx.font = '12px monospace';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('等待数据...', width / 2, height / 2);
+                        return;
+                    }
+                    
+                    ctx.beginPath();
+                    const colors = ['#6366F1', '#3B82F6', '#8B5CF6'];
+                    ctx.strokeStyle = colors[index];
+                    ctx.lineWidth = 2;
+                    
+                    const dataPoints = waveforms[index];
+                    const pointSpacing = width / dataPoints.length;
+                    
+                    for (let i = 0; i < dataPoints.length; i++) {
+                        const x = i * pointSpacing;
+                        // 将数据值映射到画布高度，假设数据范围在-100到100之间
+                        const normalizedValue = Math.max(-1, Math.min(1, dataPoints[i] / 100));
+                        const y = height / 2 - (normalizedValue * height * 0.3);
+                        
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    
+                    ctx.stroke();
+                    
+                    // 填充渐变
+                    ctx.lineTo(width, height);
+                    ctx.lineTo(0, height);
+                    ctx.closePath();
+                    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+                    gradient.addColorStop(0, colors[index] + '33');
+                    gradient.addColorStop(1, colors[index] + '00');
+                    ctx.fillStyle = gradient;
+                    ctx.fill();
+                });
+
+                requestAnimationFrame(drawEEG);
+            }
+            drawEEG();
+        },
+
+        createBubbles() {
+            const container = document.getElementById('bubble-container');
+            if (!container) return;
+            const bubbleCount = 40;
+            const gradients = [
+                'bg-gradient-to-tr from-pink-300 to-blue-300',
+                'bg-teal-200', 'bg-blue-300', 'bg-indigo-300', 'bg-orange-200', 'bg-white'
+            ];
+            const blurs = ['blur-sm', 'blur-md', 'blur-lg'];
+            const animations = ['animate-float', 'animate-float-slow', 'animate-float-reverse'];
+
+            for (let i = 0; i < bubbleCount; i++) {
+                const bubble = document.createElement('div');
+                const size = Math.floor(Math.random() * 80) + 10;
+                const left = Math.floor(Math.random() * 100);
+                const top = Math.floor(Math.random() * 100);
+                const gradient = gradients[Math.floor(Math.random() * gradients.length)];
+                const blur = blurs[Math.floor(Math.random() * blurs.length)];
+                const animation = animations[Math.floor(Math.random() * animations.length)];
+                const opacity = (Math.random() * 0.3 + 0.05).toFixed(2);
+                const delay = (Math.random() * -20).toFixed(1) + 's';
+
+                bubble.className = `dynamic-bubble absolute rounded-full ${gradient} ${blur} ${animation}`;
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${left}%`;
+                bubble.style.top = `${top}%`;
+                bubble.style.opacity = opacity;
+                bubble.style.animationDelay = delay;
+                container.appendChild(bubble);
+            }
+        },
+
+        initSpeechRecognition() {
+            // 检查浏览器是否支持语音识别
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                console.warn('当前浏览器不支持语音识别功能');
+                this.transcriptText = '浏览器不支持语音识别';
+                return;
+            }
+            
+            this.recognition = new SpeechRecognition();
+            this.recognition.lang = 'zh-CN'; // 设置为中文
+            this.recognition.continuous = false; // 单次识别
+            this.recognition.interimResults = true; // 显示中间结果
+            
+            // 识别开始
+            this.recognition.onstart = () => {
+                console.log('✓ 语音识别已启动');
+                this.isRecording = true;
+                this.transcriptText = '正在聆听...';
+            };
+            
+            // 识别结果
+            this.recognition.onresult = async (event) => {
+                const transcript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
+                
+                console.log('识别结果:', transcript);
+                this.transcriptText = transcript;
+                
+                // 如果是最终结果，发送到后端处理
+                if (event.results[0].isFinal) {
+                    await this.processVoiceInput(transcript);
+                }
+            };
+            
+            // 识别结束
+            this.recognition.onend = () => {
+                console.log('语音识别已结束');
+                this.isRecording = false;
+            };
+            
+            // 识别错误
+            this.recognition.onerror = (event) => {
+                console.error('语音识别错误:', event.error);
+                this.isRecording = false;
+                
+                const errorMessages = {
+                    'no-speech': '未检测到语音，请重试',
+                    'audio-capture': '无法访问麦克风',
+                    'not-allowed': '麦克风权限被拒绝',
+                    'network': '网络错误'
+                };
+                
+                this.transcriptText = errorMessages[event.error] || `识别失败: ${event.error}`;
+            };
+            
+            console.log('✓ 语音识别已初始化');
+        },
+
+        startVoiceRecording() {
+            if (!this.recognition) {
+                alert('语音识别功能不可用，请使用支持该功能的浏览器（如Chrome）');
+                return;
+            }
+            
+            if (this.isRecording) {
+                // 如果正在录音，则停止
+                this.recognition.stop();
+            } else {
+                // 开始录音
+                try {
+                    this.transcriptText = '准备开始...';
+                    this.recognition.start();
+                } catch (error) {
+                    console.error('启动语音识别失败:', error);
+                    this.transcriptText = '启动失败，请重试';
+                }
+            }
+        },
+
+        async processVoiceInput(text) {
+            try {
+                this.transcriptText = `处理中: "${text}"`;
+                
+                // 发送到后端处理
+                const response = await fetch('/test/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+                
+                const data = await response.json();
+                console.log('后端处理结果:', data);
+                
+                if (data.answer) {
+                    // 将字母选项转换为数字值 (A->1, B->2, C->3, D->4)
+                    const answerMap = { 'A': '1', 'B': '2', 'C': '3', 'D': '4' };
+                    const answerValue = answerMap[data.answer] || data.answer;
+                    
+                    // 自动选择答案
+                    this.selectAnswer(answerValue);
+                    this.transcriptText = `✓ 识别结果: "${text}" → 选项${data.answer}`;
+                    
+                    // 3秒后恢复默认文本
+                    setTimeout(() => {
+                        this.transcriptText = '语音识别结果将在这里显示...';
+                    }, 3000);
+                } else {
+                    // 未能识别到有效答案
+                    this.transcriptText = `"${text}" - ${data.message || '未识别到有效选项'}`;
+                    
+                    // 显示建议
+                    if (data.suggestions && data.suggestions.length > 0) {
+                        console.log('语音识别建议:', data.suggestions);
+                        setTimeout(() => {
+                            this.transcriptText = '提示：说"选A"、"选1"或"没有"、"经常"等';
+                        }, 2000);
+                    }
+                    
+                    // 5秒后恢复默认文本
+                    setTimeout(() => {
+                        this.transcriptText = '语音识别结果将在这里显示...';
+                    }, 5000);
+                }
+            } catch (error) {
+                console.error('处理语音输入失败:', error);
+                this.transcriptText = '处理失败，请重试';
+                
+                // 3秒后恢复默认文本
+                setTimeout(() => {
+                    this.transcriptText = '语音识别结果将在这里显示...';
+                }, 3000);
+            }
+        }
+    }))
+});
+</script>
+{% endblock %}

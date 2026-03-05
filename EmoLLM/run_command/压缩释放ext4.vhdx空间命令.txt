@@ -1,0 +1,67 @@
+解决方案
+要解决这个问题，你需要手动压缩或优化这个虚拟硬盘文件，将其中未使用的空间还给 Windows。操作步骤如下：
+
+第 1 步：完全关闭 WSL
+这是最重要的一步，因为在 WSL 运行时无法操作其虚拟硬盘文件。
+
+打开 PowerShell 或 CMD（命令提示符），然后运行以下命令：
+
+wsl --shutdown
+这个命令会强制关闭所有正在运行的 Linux 发行版和 WSL2 虚拟机。你可以通过运行 wsl -l -v 来确认所有发行版都处于 Stopped 状态。
+
+# 运行此命令检查状态
+wsl -l -v
+
+#  NAME            STATE           VERSION
+#* Ubuntu-22.04    Stopped         2
+第 2 步：找到你的 VHDX 文件
+WSL 发行版的虚拟硬盘文件通常存放在一个比较深的路径下。路径格式如下：
+
+%LOCALAPPDATA%\Packages\<你的发行版包名>\LocalState\ext4.vhdx
+
+%LOCALAPPDATA% 是一个环境变量，通常指向 C:\Users\<你的用户名>\AppData\Local。
+<你的发行版包名> 是一个类似 CanonicalGroupLimited.Ubuntu22.04LTS_... 的名字。
+快速找到它的方法：
+
+打开文件资源管理器。
+在地址栏输入 %LOCALAPPDATA%\Packages 并回车。
+在文件夹中找到和你的 Linux 发行版名字相关的文件夹（例如，包含 “Ubuntu”, “Debian” 等）。
+进入该文件夹，然后进入 LocalState 子文件夹，你就能看到 ext4.vhdx 文件了。
+记下这个文件的完整路径（或按住shift打开右键菜单复制文件地址），比如：
+
+C:\Users\YourUser\AppData\Local\Packages\CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc\LocalState\ext4.vhdx
+
+第 3 步：压缩 VHDX 文件
+
+使用 diskpart 工具
+如果你更习惯使用传统的命令行工具，diskpart 也可以完成这个任务。
+
+以 管理员身份 打开 CMD（命令提示符）或 PowerShell。
+
+输入 
+diskpart
+并回车，进入 diskpart 环境。
+
+依次执行以下命令，同样需要替换文件路径：
+
+# 1. 选择虚拟磁盘文件，请替换成你的实际路径
+select vdisk file="C:\Users\XHQ\AppData\Local\Packages\CanonicalGroupLimited.Ubuntu22.04LTS_79rhkp1fndgsc\LocalState\ext4.vhdx"
+
+# 2. 附加磁盘（以只读方式，更安全）
+attach vdisk readonly
+
+# 3. 压缩虚拟磁盘
+compact vdisk
+
+# 4. 分离虚拟磁盘
+detach vdisk
+
+# 5. 退出 diskpart
+exit
+
+执行 compact vdisk 时，你会看到一个进度百分比。
+
+第 4 步：验证结果
+回到 ext4.vhdx 文件所在的文件夹，右键点击文件，选择“属性”，你会发现文件的大小已经显著减小了。
+现在，你可以正常启动你的 WSL 发行版了（直接打开或在终端输入 wsl）。
+再次查看 Windows 设置中的“应用和功能”，过一段时间（或者重启电脑后），它显示的大小应该就会更新为压缩后的大小。Windows 的缓存更新可能不及时，但磁盘空间确实已经释放了。

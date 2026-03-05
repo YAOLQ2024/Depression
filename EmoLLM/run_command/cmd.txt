@@ -1,0 +1,3 @@
+redis-server.exe C:\Users\XHQ\Redis-x64-5.0.14.1\redis.windows.conf
+
+uvicorn src.app:app --host 127.0.0.1 --port 8001

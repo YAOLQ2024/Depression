@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block title %}历史记录 - SDS 评估系统{% endblock %}
+
+{% block breadcrumb %}
+<span class="text-textTertiary">工作台</span>
+<span class="mx-2 text-textTertiary">/</span>
+<span class="font-medium text-textPrimary">历史测评记录</span>
+{% endblock %}
+
+{% block content %}
+<style>
+    .glass-panel {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.85) 100%);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .pattern-dots {
+        background-image: radial-gradient(#94A3B8 1px, transparent 1px);
+        background-size: 20px 20px;
+        opacity: 0.08;
+        position: absolute; inset: 0; pointer-events: none; z-index: 0;
+    }
+
+    .inner-bubble {
+        position: absolute;
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+        filter: blur(2px);
+    }
+
+    @keyframes float-small {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(30px, -30px); }
+    }
+    @keyframes float-small-reverse {
+        0%, 100% { transform: translate(0, 0); }
+        50% { transform: translate(-30px, 30px); }
+    }
+    
+    .animate-float-small { animation: float-small 6s ease-in-out infinite; }
+    .animate-float-small-reverse { animation: float-small-reverse 7s ease-in-out infinite; }
+
+    .record-card {
+        transition: all 0.3s ease;
+    }
+    .record-card:hover {
+        transform: translateY(-2px);
+    }
+</style>
+
+<div class="relative m-0">
+    <main class="relative z-10 w-full p-[30px]">
+        <div class="space-y-6">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h1 class="text-2xl font-bold text-textPrimary">历史测评记录</h1>
+        <a href="{{ url_for('test.SDS') }}" class="inline-flex items-center justify-center px-4 py-2 bg-[#165DFF] hover:bg-[#165DFF]/90 text-white rounded-btn font-medium transition-all shadow-md shadow-blue-500/20">
+            <i class="fa-solid fa-plus mr-2"></i> 新的测评
+        </a>
+    </div>
+
+    <!-- Filters Card -->
+    <div class="bg-white p-4 rounded-card shadow-sm border-none">
+        <div class="flex flex-col md:flex-row gap-4">
+            <div class="relative flex-1">
+                <i class="fa-solid fa-search absolute left-3 top-2.5 text-textTertiary text-sm"></i>
+                <input type="text" placeholder="搜索记录 ID..." 
+                    class="block w-full pl-10 pr-3 py-2 bg-[#F7F9FC] border border-[#E5E8EF] rounded-btn text-sm text-textPrimary placeholder-textTertiary focus:outline-none focus:bg-white focus:border-[#165DFF] focus:ring-1 focus:ring-[#165DFF] transition-all">
+            </div>
+            <div class="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+                <button class="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-textSecondary rounded-btn text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-calendar"></i>
+                    时间范围
+                </button>
+                <button class="px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-textSecondary rounded-btn text-sm font-medium transition-colors flex items-center gap-2 whitespace-nowrap">
+                    <i class="fa-solid fa-filter"></i>
+                    结果等级
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trend Chart -->
+    <div class="glass-panel rounded-card shadow-sm p-6 relative overflow-hidden">
+        <div class="pattern-dots"></div>
+        
+        <!-- 卡片内氛围泡泡 -->
+        <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+            <div class="inner-bubble w-40 h-40 -top-10 -right-10 bg-blue-200/40 animate-float-small"></div>
+            <div class="inner-bubble w-32 h-32 -bottom-5 -left-5 bg-purple-200/35 animate-float-small-reverse"></div>
+            <div class="inner-bubble w-24 h-24 top-1/2 right-1/4 bg-indigo-100/30 animate-float-small"></div>
+        </div>
+
+        <div class="relative z-10">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-textPrimary">分数趋势</h3>
+                        <p class="text-xs text-textTertiary">近期测评数据走势</p>
+                    </div>
+                </div>
+                <span class="text-xs text-blue-600 bg-blue-50 px-3 py-1 rounded-full font-semibold border border-blue-100">最近10次</span>
+            </div>
+            <div class="h-64 w-full">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Records List -->
+    <div class="space-y-4">
+        {% if sorted_list %}
+            {% for record in sorted_list %}
+            <div class="record-card glass-panel rounded-card shadow-sm hover:shadow-md transition-all overflow-hidden">
+                <div class="pattern-dots"></div>
+                
+                <!-- 卡片内小气泡 -->
+                <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                    {% if record.result == '无抑郁' or record.result == '无明显抑郁' %}
+                        <div class="inner-bubble w-20 h-20 top-1/2 left-1/3 bg-green-200/30 animate-float-small"></div>
+                        <div class="inner-bubble w-16 h-16 top-1/4 right-1/4 bg-teal-100/25 animate-float-small-reverse"></div>
+                    {% elif record.result == '轻度抑郁' %}
+                        <div class="inner-bubble w-20 h-20 top-1/2 left-1/3 bg-yellow-200/30 animate-float-small"></div>
+                        <div class="inner-bubble w-16 h-16 top-1/4 right-1/4 bg-orange-100/25 animate-float-small-reverse"></div>
+                    {% elif record.result == '中度抑郁' %}
+                        <div class="inner-bubble w-20 h-20 top-1/2 left-1/3 bg-orange-200/30 animate-float-small"></div>
+                        <div class="inner-bubble w-16 h-16 top-1/4 right-1/4 bg-red-100/25 animate-float-small-reverse"></div>
+                    {% else %}
+                        <div class="inner-bubble w-20 h-20 top-1/2 left-1/3 bg-red-200/30 animate-float-small"></div>
+                        <div class="inner-bubble w-16 h-16 top-1/4 right-1/4 bg-rose-100/25 animate-float-small-reverse"></div>
+                    {% endif %}
+                </div>
+
+                <div class="relative z-10 p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <!-- Left: Score & Info -->
+                    <div class="flex items-center gap-4 flex-1">
+                        <!-- 大号分数显示 -->
+                        <div class="shrink-0">
+                            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg
+                                {% if record.result == '无抑郁' or record.result == '无明显抑郁' %}
+                                    from-green-400 to-teal-500 text-white
+                                {% elif record.result == '轻度抑郁' %}
+                                    from-yellow-400 to-orange-500 text-white
+                                {% elif record.result == '中度抑郁' %}
+                                    from-orange-400 to-red-500 text-white
+                                {% else %}
+                                    from-red-500 to-rose-600 text-white
+                                {% endif %}">
+                                <div class="text-center">
+                                    <div class="text-2xl font-bold">{{ record.score }}</div>
+                                    <div class="text-[9px] opacity-80">分</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 信息部分 -->
+                        <div class="space-y-2">
+                            <div class="flex items-center gap-3 flex-wrap">
+                                {% if record.result == '无抑郁' or record.result == '无明显抑郁' %}
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E8FFEA] text-success text-xs font-semibold border border-[#00B42A]/50">
+                                        <i class="fa-solid fa-face-smile"></i>
+                                        无明显抑郁
+                                    </span>
+                                {% elif record.result == '轻度抑郁' %}
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF7E8] text-warning text-xs font-semibold border border-[#FF7D00]/50">
+                                        <i class="fa-solid fa-face-meh"></i>
+                                        轻度抑郁
+                                    </span>
+                                {% elif record.result == '中度抑郁' %}
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 text-orange-600 text-xs font-semibold border border-orange-100">
+                                        <i class="fa-solid fa-face-frown"></i>
+                                        中度抑郁
+                                    </span>
+                                {% else %}
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFECE8] text-danger text-xs font-semibold border border-[#F53F3F]/50">
+                                        <i class="fa-solid fa-face-sad-tear"></i>
+                                        重度抑郁
+                                    </span>
+                                {% endif %}
+                                
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium">
+                                    <i class="fa-solid fa-clock text-[10px]"></i>
+                                    {{ record.time }}
+                                </span>
+                            </div>
+                            <div class="text-xs text-textTertiary flex gap-4">
+                                <span class="flex items-center gap-1">
+                                    <i class="fa-solid fa-hashtag text-[10px]"></i>
+                                    ID: {{ record.id }}
+                                </span>
+                                <span class="flex items-center gap-1">
+                                    <i class="fa-solid fa-stopwatch text-[10px]"></i>
+                                    用时: ~4分钟
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Actions -->
+                    <div class="flex items-center gap-2 w-full md:w-auto shrink-0">
+                        <a href="{{ url_for('main.comprehensive_detail', record_id=record.id) }}" 
+                            class="flex-1 md:flex-none px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-btn text-sm font-semibold transition-all shadow-md hover:shadow-lg flex items-center gap-2">
+                            <i class="fa-solid fa-chart-mixed"></i>
+                            综合分析
+                        </a>
+                        <a href="{{ url_for('main.detail', record_id=record.id) }}"
+                            class="flex-1 md:flex-none px-4 py-2 bg-white/80 border border-slate-200 hover:bg-slate-50 text-textSecondary hover:text-textPrimary rounded-btn text-sm font-semibold transition-all flex items-center gap-2 hover:border-blue-300">
+                            <i class="fa-solid fa-list-check"></i>
+                            答题详情
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <!-- Empty State -->
+            <div class="glass-panel rounded-card shadow-sm p-12 text-center relative overflow-hidden">
+                <div class="pattern-dots"></div>
+                <div class="absolute inset-0 pointer-events-none overflow-hidden z-0">
+                    <div class="inner-bubble w-32 h-32 top-10 left-1/4 bg-blue-200/20 animate-float-small"></div>
+                    <div class="inner-bubble w-24 h-24 bottom-10 right-1/4 bg-purple-200/20 animate-float-small-reverse"></div>
+                </div>
+                
+                <div class="relative z-10">
+                    <div class="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-regular fa-folder-open text-3xl text-blue-500"></i>
+                    </div>
+                    <p class="font-bold text-textPrimary mb-2 text-lg">暂无测评记录</p>
+                    <p class="text-sm text-textTertiary mb-6">开始您的第一次心理健康测评吧</p>
+                    <a href="{{ url_for('test.SDS') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/30 font-semibold">
+                        <i class="fa-solid fa-play"></i>
+                        开始测评
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+        </div>
+    </main>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// 趋势图配置
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('trendChart');
+    if (ctx) {
+        const chartCtx = ctx.getContext('2d');
+        
+        // 渐变背景
+        const gradient = chartCtx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
+        gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
+
+        // 从服务器获取实际数据 (这里使用示例数据)
+        const sortedList = {{ sorted_list | tojson if sorted_list else '[]' }};
+        
+        let labels = [];
+        let data = [];
+        
+        if (sortedList && sortedList.length > 0) {
+            // 取最近10条记录，按时间正序排列
+            const recentRecords = sortedList.slice(0, 10).reverse();
+            labels = recentRecords.map(r => {
+                const time = r.finish_time || r.time || '';
+                // 提取日期部分 (MM-DD)
+                const match = time.match(/(\d{2})-(\d{2})/);
+                return match ? `${match[1]}-${match[2]}` : time;
+            });
+            data = recentRecords.map(r => r.score || 0);
+        } else {
+            // 占位数据
+            labels = ['暂无数据'];
+            data = [0];
+        }
+
+        const trendChart = new Chart(chartCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'SDS 分数',
+                    data: data,
+                    borderColor: '#3B82F6',
+                    backgroundColor: gradient,
+                    borderWidth: 3,
+                    pointBackgroundColor: '#FFFFFF',
+                    pointBorderColor: '#3B82F6',
+                    pointBorderWidth: 3,
+                    pointRadius: 6,
+                    pointHoverRadius: 8,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        titleColor: '#1E293B',
+                        bodyColor: '#475569',
+                        borderColor: '#E2E8F0',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 6,
+                        cornerRadius: 12,
+                        displayColors: true,
+                        titleFont: { family: "'Noto Sans SC', sans-serif", size: 13, weight: 'bold' },
+                        bodyFont: { family: "'Noto Sans SC', sans-serif", size: 13 },
+                        callbacks: {
+                            label: (context) => {
+                                const score = context.parsed.y;
+                                let level = '';
+                                if (score < 50) level = '无抑郁';
+                                else if (score >= 50 && score <= 60) level = '轻度抑郁';
+                                else if (score >= 61 && score <= 70) level = '中度抑郁';
+                                else level = '重度抑郁';
+                                return `SDS 分数: ${score} (${level})`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { 
+                            color: '#94A3B8',
+                            font: { size: 11, family: "'Noto Sans SC', sans-serif" }
+                        }
+                    },
+                    y: {
+                        border: { display: false },
+                        grid: {
+                            color: '#F1F5F9',
+                            borderDash: [4, 4]
+                        },
+                        ticks: {
+                            color: '#94A3B8',
+                            padding: 10,
+                            font: { size: 11, family: "'Noto Sans SC', sans-serif" }
+                        },
+                        min: 20,
+                        max: 100
+                    }
+                },
+                layout: { padding: { top: 10, bottom: 0, left: 0, right: 0 } }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,680 @@
+.
+├── LICENSE
+├── README.md
+├── README_EN.md
+├── README_JP.md
+├── agents
+│   ├── README.md
+│   ├── __init__.py
+│   ├── actions
+│   │   ├── __init__.py
+│   │   └── write_markdown.py
+│   ├── code.py
+│   ├── config.yml
+│   ├── roles
+│   │   └── __init__.py
+│   ├── tests
+│   │   └── test_markdown.py
+│   └── utils
+│       ├── __init__.py
+│       └── common_llm_api.py
+├── app.py
+├── app_Llama3_Gradio.py
+├── app_Llama3_Gradio2.py
+├── app_web_demo-Llama3.py
+├── assets
+│   ├── EmoLLM.png
+│   ├── EmoLLM_logo.png
+│   ├── EmoLLM_logo_L.png
+│   ├── EmoLLM_transparent.png
+│   ├── Roadmap_EN.png
+│   ├── Roadmap_ZH.png
+│   ├── Shusheng.png
+│   ├── aiwei_demo.gif
+│   ├── aiwei_demo2.gif
+│   ├── aiwei_demo3.gif
+│   ├── aiwei_demo4.gif
+│   ├── aiwei_logo.jpg
+│   ├── deploy_1.png
+│   ├── deploy_2.png
+│   ├── deploy_3.png
+│   ├── deploy_4.png
+│   ├── emoxlmdeploy.png
+│   ├── logo.jpeg
+│   ├── model.png
+│   ├── new_openxlab_app_demo.png
+│   ├── robot.jpeg
+│   ├── turbomind结构.png
+│   ├── user.png
+│   ├── 框架图.png
+│   └── 浦语挑战赛TOP50.jpg
+├── back
+│   └── dataset
+│       ├── EmoLLM数据库E-R图
+│       │   ├── EmoLLM数据库E-R图.md
+│       │   ├── er1.png
+│       │   ├── er2.png
+│       │   ├── er3.png
+│       │   ├── er4.png
+│       │   └── er5.png
+│       └── EmoLLM数据库SQL.md
+├── before_rag.txt
+├── careyou
+│   ├── AR
+│   │   ├── __init__.py
+│   │   ├── models
+│   │   │   ├── __init__.py
+│   │   │   ├── t2s_lightning_module.py
+│   │   │   ├── t2s_lightning_module_onnx.py
+│   │   │   ├── t2s_model.py
+│   │   │   ├── t2s_model_onnx.py
+│   │   │   └── utils.py
+│   │   ├── modules
+│   │   │   ├── __init__.py
+│   │   │   ├── activation.py
+│   │   │   ├── activation_onnx.py
+│   │   │   ├── embedding.py
+│   │   │   ├── embedding_onnx.py
+│   │   │   ├── lr_schedulers.py
+│   │   │   ├── optim.py
+│   │   │   ├── patched_mha_with_cache.py
+│   │   │   ├── patched_mha_with_cache_onnx.py
+│   │   │   ├── scaling.py
+│   │   │   ├── transformer.py
+│   │   │   └── transformer_onnx.py
+│   │   ├── text_processing
+│   │   │   ├── __init__.py
+│   │   │   ├── phonemizer.py
+│   │   │   └── symbols.py
+│   │   └── utils
+│   │       ├── __init__.py
+│   │       ├── initialize.py
+│   │       └── io.py
+│   ├── EmoLLMRAGTXT
+│   │   └── vector_db
+│   │       ├── index.faiss
+│   │       └── index.pkl
+│   ├── LICENSE
+│   ├── README.md
+│   ├── app.py
+│   ├── assets
+│   │   └── careyou.png
+│   ├── audio
+│   │   ├── heart_girl
+│   │   │   ├── heartful_sister.wav
+│   │   │   └── slicer_opt.list
+│   │   └── sunny_girl
+│   │       ├── slicer_opt.list
+│   │       └── sunshine_girl.wav
+│   ├── configs
+│   │   ├── s1.yaml
+│   │   ├── s1big.yaml
+│   │   ├── s1big2.yaml
+│   │   ├── s1longer.yaml
+│   │   ├── s1mq.yaml
+│   │   ├── s2.json
+│   │   └── train.yaml
+│   ├── faiss_gpu-1.7.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+│   ├── feature_extractor
+│   │   ├── __init__.py
+│   │   ├── cnhubert.py
+│   │   └── whisper_enc.py
+│   ├── module
+│   │   ├── __init__.py
+│   │   ├── attentions.py
+│   │   ├── attentions_onnx.py
+│   │   ├── commons.py
+│   │   ├── core_vq.py
+│   │   ├── data_utils.py
+│   │   ├── losses.py
+│   │   ├── mel_processing.py
+│   │   ├── models.py
+│   │   ├── models_onnx.py
+│   │   ├── modules.py
+│   │   ├── mrte_model.py
+│   │   ├── quantize.py
+│   │   └── transforms.py
+│   ├── my_utils.py
+│   ├── nltk_data
+│   │   ├── corpora
+│   │   │   ├── cmudict
+│   │   │   │   ├── README
+│   │   │   │   └── cmudict
+│   │   │   └── cmudict.zip
+│   │   ├── taggers
+│   │   │   ├── averaged_perceptron_tagger
+│   │   │   │   └── averaged_perceptron_tagger.pickle
+│   │   │   ├── averaged_perceptron_tagger.zip
+│   │   │   ├── averaged_perceptron_tagger_eng
+│   │   │   │   ├── averaged_perceptron_tagger_eng.classes.json
+│   │   │   │   ├── averaged_perceptron_tagger_eng.tagdict.json
+│   │   │   │   └── averaged_perceptron_tagger_eng.weights.json
+│   │   │   └── averaged_perceptron_tagger_eng.zip
+│   │   └── tokenizers
+│   │       ├── punkt
+│   │       │   ├── PY3
+│   │       │   │   ├── README
+│   │       │   │   ├── czech.pickle
+│   │       │   │   ├── danish.pickle
+│   │       │   │   ├── dutch.pickle
+│   │       │   │   ├── english.pickle
+│   │       │   │   ├── estonian.pickle
+│   │       │   │   ├── finnish.pickle
+│   │       │   │   ├── french.pickle
+│   │       │   │   ├── german.pickle
+│   │       │   │   ├── greek.pickle
+│   │       │   │   ├── italian.pickle
+│   │       │   │   ├── malayalam.pickle
+│   │       │   │   ├── norwegian.pickle
+│   │       │   │   ├── polish.pickle
+│   │       │   │   ├── portuguese.pickle
+│   │       │   │   ├── russian.pickle
+│   │       │   │   ├── slovene.pickle
+│   │       │   │   ├── spanish.pickle
+│   │       │   │   ├── swedish.pickle
+│   │       │   │   └── turkish.pickle
+│   │       │   ├── README
+│   │       │   ├── czech.pickle
+│   │       │   ├── danish.pickle
+│   │       │   ├── dutch.pickle
+│   │       │   ├── english.pickle
+│   │       │   ├── estonian.pickle
+│   │       │   ├── finnish.pickle
+│   │       │   ├── french.pickle
+│   │       │   ├── german.pickle
+│   │       │   ├── greek.pickle
+│   │       │   ├── italian.pickle
+│   │       │   ├── malayalam.pickle
+│   │       │   ├── norwegian.pickle
+│   │       │   ├── polish.pickle
+│   │       │   ├── portuguese.pickle
+│   │       │   ├── russian.pickle
+│   │       │   ├── slovene.pickle
+│   │       │   ├── spanish.pickle
+│   │       │   ├── swedish.pickle
+│   │       │   └── turkish.pickle
+│   │       └── punkt.zip
+│   ├── rag
+│   │   ├── README.md
+│   │   ├── README_EN.md
+│   │   ├── pdf2md
+│   │   │   ├── README.md
+│   │   │   └── pdf2md.py
+│   │   ├── requirements.txt
+│   │   └── src
+│   │       ├── config
+│   │       │   └── config.py
+│   │       ├── data_processing.py
+│   │       ├── main.py
+│   │       ├── pipeline.py
+│   │       └── util
+│   │           ├── encode.py
+│   │           ├── llm.py
+│   │           └── text_seg.py
+│   ├── requirements.txt
+│   ├── text
+│   │   ├── __init__.py
+│   │   ├── chinese.py
+│   │   ├── cleaner.py
+│   │   ├── cmudict.rep
+│   │   ├── cmudict_cache.pickle
+│   │   ├── english.py
+│   │   ├── japanese.py
+│   │   ├── opencpop-strict.txt
+│   │   ├── symbols.py
+│   │   └── tone_sandhi.py
+│   └── utils.py
+├── chat_history
+│   └── cursor_where_is_qa_request_interval_set.md
+├── datasets
+│   ├── README.md
+│   ├── README_EN.md
+│   ├── SoulStar_data.json
+│   ├── aiwei.json
+│   ├── data.json
+│   ├── data_pro.json
+│   ├── mother_v1.json
+│   ├── mother_v2.json
+│   ├── multi_turn_dataset_1.json
+│   ├── multi_turn_dataset_2.json
+│   ├── processed
+│   │   ├── Book_QA_Process.md
+│   │   ├── Book_QA_process_Step_1.py
+│   │   ├── Book_QA_process_Step_2.py
+│   │   ├── deduplicate.py
+│   │   ├── output.json
+│   │   ├── output2.json
+│   │   ├── process.py
+│   │   ├── process_merge.py
+│   │   ├── process_self_cognition.py
+│   │   ├── process_single_turn_conversation_construction.py
+│   │   ├── processed_self_cognition_EmoLLM.json
+│   │   ├── ruozhiba_format_emo.jsonl
+│   │   ├── ruozhiba_raw_data_process.py
+│   │   ├── split_dataset.py
+│   │   └── split_shuffle.py
+│   ├── psychology-10k-Deepseek-R1-zh.json
+│   ├── pt
+│   │   └── pt.json
+│   ├── ruozhiba_raw.jsonl
+│   ├── scientist.json
+│   ├── self_cognition_EmoLLM.json
+│   ├── single_turn_dataset_1.json
+│   ├── single_turn_dataset_2.json
+│   └── tiangou.json
+├── demo
+│   ├── README.md
+│   ├── README_EN.md
+│   ├── cli_Llama3-8B-Instruct.py
+│   ├── cli_internlm2.py
+│   ├── cli_internlm2_scientist.py
+│   ├── cli_qwen.py
+│   ├── requirements_qwen.txt
+│   └── web_qwen.py
+├── deploy
+│   ├── Imdeploy_EN.md
+│   ├── api-file.py
+│   └── lmdeploy.md
+├── depression_pdfs
+│   ├── ICD11精神行为和神经发育障碍的临床描述和诊断要求CDDR.pdf
+│   ├── PHQ9抑郁症筛查量表.pdf
+│   ├── 中华人民共和国精神卫生法.pdf
+│   ├── 中国抑郁障碍防治指南2025版.pdf
+│   ├── 成人抑郁症和自杀风险筛查.pdf
+│   ├── 成人抑郁症治疗和管理.pdf
+│   ├── 抑郁症和焦虑症问题的协作护理.pdf
+│   ├── 抑郁症治疗与管理的专家推荐意见2022年.pdf
+│   ├── 抑郁症诊断方法与相关干预研究综述.pdf
+│   ├── 抑郁自评量表SDS.pdf
+│   ├── 抑郁障碍中华人民共和国国家卫生健康委员会精神障碍诊疗规范.pdf
+│   ├── 抑郁障碍抑郁症世界卫生组织20250829.pdf
+│   ├── 抑郁障碍防治指南.pdf
+│   ├── 汉密顿抑郁量表HAMD.pdf
+│   ├── 爱丁堡产后抑郁量表EPDS.pdf
+│   ├── 精神障碍世界卫生组织20191128.pdf
+│   ├── 运动对抑郁症的影响随机对照试验的系统评价和网络荟萃分析.pdf
+│   ├── 适用于老年人群的抑郁筛查.pdf
+│   └── 重复经颅磁刺激治疗抑郁症.pdf
+├── doc
+│   └── GLM-4-9B-chat Lora 微调（llama-factory）.md
+├── download_model.py
+├── environment.full.yml
+├── evaluate
+│   ├── General_evaluation.md
+│   ├── General_evaluation_EN.md
+│   ├── InternLM2_7B_chat_eval.py
+│   ├── Professional_evaluation.md
+│   ├── Professional_evaluation_EN.md
+│   ├── Qwen1_5-0_5B-Chat_eval.py
+│   ├── README.md
+│   ├── README_EN.md
+│   ├── data_dir
+│   │   ├── convert.py
+│   │   ├── converted.json
+│   │   └── data.json
+│   ├── metric.py
+│   └── qwen_generation_utils.py
+├── front
+│   └── Wechat small program prototype design
+│       ├── EmoLLM原型图.md
+│       └── ui
+│           ├── emollm小程序.bitmap-1.jpg
+│           ├── emollm小程序.bitmap-10.jpg
+│           ├── emollm小程序.bitmap-11.jpg
+│           ├── emollm小程序.bitmap-12.jpg
+│           ├── emollm小程序.bitmap-13.jpg
+│           ├── emollm小程序.bitmap-14.jpg
+│           ├── emollm小程序.bitmap-15.jpg
+│           ├── emollm小程序.bitmap-2.jpg
+│           ├── emollm小程序.bitmap-3.jpg
+│           ├── emollm小程序.bitmap-4.jpg
+│           ├── emollm小程序.bitmap-5.jpg
+│           ├── emollm小程序.bitmap-6.jpg
+│           ├── emollm小程序.bitmap-7.jpg
+│           ├── emollm小程序.bitmap-8.jpg
+│           └── emollm小程序.bitmap-9.jpg
+├── generate_data
+│   ├── OCR.md
+│   ├── check.py
+│   ├── config.yml
+│   ├── ernie_gen_data.py
+│   ├── main.ipynb
+│   ├── merge_json.py
+│   ├── merge_jsonl.py
+│   ├── merge_jsonl_r.py
+│   ├── qwen_gen_data.py
+│   ├── qwen_gen_data_NoBash.py
+│   ├── requirements.txt
+│   ├── run_qwen.bash
+│   ├── tutorial.md
+│   ├── tutorial_EN.md
+│   ├── xinghuo
+│   │   ├── Readme.md
+│   │   ├── Readme_EN.md
+│   │   ├── SparkApi.py
+│   │   ├── gen_Chat.py
+│   │   ├── gen_data.py
+│   │   └── prompt.py
+│   └── zhipuai_gen_data.py
+├── model
+│   ├── EmoLLM_PT_InternLM1_8B-chat
+│   │   ├── README.md
+│   │   ├── config.json
+│   │   ├── configuration.json
+│   │   ├── generation_config.json
+│   │   ├── pytorch_model-00001-of-00009.bin
+│   │   ├── pytorch_model-00002-of-00009.bin
+│   │   ├── pytorch_model-00003-of-00009.bin
+│   │   ├── pytorch_model-00004-of-00009.bin
+│   │   ├── pytorch_model-00005-of-00009.bin
+│   │   ├── pytorch_model-00006-of-00009.bin
+│   │   ├── pytorch_model-00007-of-00009.bin
+│   │   ├── pytorch_model-00008-of-00009.bin
+│   │   ├── pytorch_model-00009-of-00009.bin
+│   │   ├── pytorch_model.bin.index.json
+│   │   ├── special_tokens_map.json
+│   │   ├── tokenizer.json
+│   │   └── tokenizer_config.json
+│   ├── EmoLLM_Qwen1_5-0_5B-Chat_full_sft
+│   │   ├── README.md
+│   │   ├── added_tokens.json
+│   │   ├── config.json
+│   │   ├── configuration.json
+│   │   ├── generation_config.json
+│   │   ├── merges.txt
+│   │   ├── pytorch_model.bin
+│   │   ├── special_tokens_map.json
+│   │   ├── tokenizer.json
+│   │   ├── tokenizer_config.json
+│   │   ├── vocab.json
+│   │   └── xtuner_config.py
+│   └── EmoLLM_Qwen2-7B-Instruct_lora
+│       ├── README.md
+│       ├── added_tokens.json
+│       ├── config.json
+│       ├── configuration.json
+│       ├── generation_config.json
+│       ├── merges.txt
+│       ├── pytorch_model-00001-of-00009.bin
+│       ├── pytorch_model-00002-of-00009.bin
+│       ├── pytorch_model-00003-of-00009.bin
+│       ├── pytorch_model-00004-of-00009.bin
+│       ├── pytorch_model-00005-of-00009.bin
+│       ├── pytorch_model-00006-of-00009.bin
+│       ├── pytorch_model-00007-of-00009.bin
+│       ├── pytorch_model-00008-of-00009.bin
+│       ├── pytorch_model-00009-of-00009.bin
+│       ├── pytorch_model.bin.index.json
+│       ├── special_tokens_map.json
+│       ├── tokenizer.json
+│       ├── tokenizer_config.json
+│       └── vocab.json
+├── packages.txt
+├── quick_start
+│   ├── Baby_EmoLLM.ipynb
+│   ├── quick_start.md
+│   └── quick_start_EN.md
+├── rag
+│   ├── EmoLLMRAGTXT
+│   │   └── vector_db
+│   │       ├── index.faiss
+│   │       └── index.pkl
+│   ├── README.md
+│   ├── README_EN.md
+│   ├── __pycache__
+│   │   ├── build_my_knowledge_base.cpython-311.pyc
+│   │   └── merge_vector_db.cpython-311.pyc
+│   ├── build_my_knowledge_base.py
+│   ├── data
+│   │   ├── json
+│   │   │   ├── 2025-11-13_21-18-17-抑郁症世界卫生组织定义.txt-qwen.json
+│   │   │   ├── 2025-11-14_11-21-45-汉密顿抑郁量表HAMD.txt-qwen.json
+│   │   │   ├── 2025-11-14_11-21-45-精神障碍世界卫生组织20191128.txt-qwen.json
+│   │   │   ├── 2025-11-14_11-30-34-成人抑郁症治疗和管理.txt-qwen.json
+│   │   │   ├── 2025-11-14_11-35-44-精神障碍诊疗规范.txt-qwen.json
+│   │   │   ├── 2025-11-14_11-38-44-抑郁症自评量表SDS.txt-qwen.json
+│   │   │   ├── 2025-11-14_11-38-44-抑郁症防治指南.txt-qwen.json
+│   │   │   └── 2025-11-14_11-51-56-抑郁障碍中华人民共和国国家卫生健康委员会精神障碍诊疗规范.txt-qwen.json
+│   │   └── txt
+│   │       ├── ICD11精神行为和神经发育障碍的临床描述和诊断要求CDDR.txt
+│   │       ├── PHQ9抑郁症筛查量表.txt
+│   │       ├── 中华人民共和国精神卫生法.txt
+│   │       ├── 中国抑郁障碍防治指南2025版.txt
+│   │       ├── 成人抑郁症和自杀风险筛查.txt
+│   │       ├── 成人抑郁症治疗和管理.txt
+│   │       ├── 抑郁症世界卫生组织定义.txt
+│   │       ├── 抑郁症和焦虑症问题的协作护理.txt
+│   │       ├── 抑郁症治疗与管理的专家推荐意见2022年.txt
+│   │       ├── 抑郁症诊断方法与相关干预研究综述.txt
+│   │       ├── 抑郁障碍中华人民共和国国家卫生健康委员会精神障碍诊疗规范.txt
+│   │       ├── 抑郁障碍防治指南.txt
+│   │       ├── 汉密顿抑郁量表HAMD.txt
+│   │       ├── 精神障碍世界卫生组织20191128.txt
+│   │       └── 适用于老年人群的抑郁筛查.txt
+│   ├── merge_vector_db.py
+│   ├── merged_depression_kb
+│   │   └── vector_db
+│   │       ├── index.faiss
+│   │       └── index.pkl
+│   ├── model
+│   │   ├── embedding_model
+│   │   │   ├── 1_Pooling
+│   │   │   │   └── config.json
+│   │   │   ├── README.md
+│   │   │   ├── bge-small-zh-v1.5.pkl
+│   │   │   ├── config.json
+│   │   │   ├── config_sentence_transformers.json
+│   │   │   ├── model.safetensors
+│   │   │   ├── modules.json
+│   │   │   ├── pytorch_model.bin
+│   │   │   ├── sentence_bert_config.json
+│   │   │   ├── special_tokens_map.json
+│   │   │   ├── tokenizer.json
+│   │   │   ├── tokenizer_config.json
+│   │   │   └── vocab.txt
+│   │   └── rerank_model
+│   │       ├── README.md
+│   │       ├── bge-reranker-large.pkl
+│   │       ├── config.json
+│   │       ├── configuration.json
+│   │       ├── model.safetensors
+│   │       ├── onnx
+│   │       │   ├── model.onnx
+│   │       │   └── model.onnx_data
+│   │       ├── pytorch_model.bin
+│   │       ├── sentencepiece.bpe.model
+│   │       ├── special_tokens_map.json
+│   │       ├── tokenizer.json
+│   │       └── tokenizer_config.json
+│   ├── myDD_knowledge_txt
+│   │   └── vector_db
+│   │       ├── index.faiss
+│   │       └── index.pkl
+│   ├── my_depression_kb
+│   │   └── vector_db
+│   │       ├── index.faiss
+│   │       └── index.pkl
+│   ├── pdf2md
+│   │   ├── README.md
+│   │   └── pdf2md.py
+│   ├── requirements.txt
+│   ├── src
+│   │   ├── __pycache__
+│   │   │   ├── data_processing.cpython-311.pyc
+│   │   │   └── pipeline.cpython-311.pyc
+│   │   ├── config
+│   │   │   ├── __pycache__
+│   │   │   │   └── config.cpython-311.pyc
+│   │   │   └── config.py
+│   │   ├── data
+│   │   ├── data_processing.py
+│   │   ├── main.py
+│   │   ├── pipeline.py
+│   │   └── util
+│   │       ├── encode.py
+│   │       ├── llm.py
+│   │       └── text_seg.py
+│   ├── 快速开始-自定义知识库.md
+│   └── 知识库构建教程.md
+├── requirements.freeze.txt
+├── requirements.txt
+├── scripts
+│   ├── README_Model_Uploading.md
+│   ├── asserts
+│   │   ├── GitHub与平台的关系.bee7809e.png
+│   │   ├── full_upload.png
+│   │   ├── ms_config.png
+│   │   ├── ms_create.png
+│   │   ├── ms_upload.png
+│   │   ├── openxlab.png
+│   │   ├── result1.png
+│   │   ├── result2.png
+│   │   ├── unautheorized.png
+│   │   ├── upload_error.png
+│   │   ├── upload_error_solution.png
+│   │   ├── upload_error_solution2.png
+│   │   ├── username_password.png
+│   │   └── 平台概述.e6d980f8.png
+│   ├── check.py
+│   ├── gen_metafile.py
+│   ├── merge_json.py
+│   ├── pdf2txt.py
+│   ├── process.py
+│   ├── qa_generation
+│   │   ├── QA_clean.py
+│   │   ├── README.md
+│   │   ├── README_EN.md
+│   │   ├── chooseDD_prompt.md
+│   │   ├── choose_prompt.md
+│   │   ├── config
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   └── config.cpython-311.pyc
+│   │   │   └── config.py
+│   │   ├── convert_jsonl_to_json.py
+│   │   ├── data
+│   │   │   ├── cleaned
+│   │   │   │   ├── 2025-11-13_21-18-17-抑郁症世界卫生组织定义.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-13_21-18-17-抑郁症世界卫生组织定义.txt-qwen.jsonl:Zone.Identifier
+│   │   │   │   ├── 2025-11-14_11-21-45-汉密顿抑郁量表HAMD.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-21-45-汉密顿抑郁量表HAMD.txt-qwen.jsonl:Zone.Identifier
+│   │   │   │   ├── 2025-11-14_11-21-45-精神障碍世界卫生组织20191128.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-21-45-精神障碍世界卫生组织20191128.txt-qwen.jsonl:Zone.Identifier
+│   │   │   │   ├── 2025-11-14_11-30-34-成人抑郁症治疗和管理.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-30-34-成人抑郁症治疗和管理.txt-qwen.jsonl:Zone.Identifier
+│   │   │   │   ├── 2025-11-14_11-35-44-精神障碍诊疗规范.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-35-44-精神障碍诊疗规范.txt-qwen.jsonl:Zone.Identifier
+│   │   │   │   ├── 2025-11-14_11-38-44-抑郁症自评量表SDS.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-38-44-抑郁症自评量表SDS.txt-qwen.jsonl:Zone.Identifier
+│   │   │   │   ├── 2025-11-14_11-38-44-抑郁症防治指南.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-38-44-抑郁症防治指南.txt-qwen.jsonl:Zone.Identifier
+│   │   │   │   ├── 2025-11-14_11-51-56-抑郁障碍中华人民共和国国家卫生健康委员会精神障碍诊疗规范.txt-qwen.jsonl
+│   │   │   │   └── 2025-11-14_11-51-56-抑郁障碍中华人民共和国国家卫生健康委员会精神障碍诊疗规范.txt-qwen.jsonl:Zone.Identifier
+│   │   │   ├── generated
+│   │   │   │   ├── 2025-11-13_21-18-17-抑郁症世界卫生组织定义.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-21-45-汉密顿抑郁量表HAMD.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-21-45-精神障碍世界卫生组织20191128.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-30-34-成人抑郁症治疗和管理.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-35-44-精神障碍诊疗规范.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-38-44-抑郁症自评量表SDS.txt-qwen.jsonl
+│   │   │   │   ├── 2025-11-14_11-38-44-抑郁症防治指南.txt-qwen.jsonl
+│   │   │   │   └── 2025-11-14_11-51-56-抑郁障碍中华人民共和国国家卫生健康委员会精神障碍诊疗规范.txt-qwen.jsonl
+│   │   │   └── txt
+│   │   │       └── 抑郁障碍中华人民共和国国家卫生健康委员会精神障碍诊疗规范.txt
+│   │   ├── log
+│   │   │   └── log.log
+│   │   ├── main.py
+│   │   ├── model
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   └── qwen.cpython-311.pyc
+│   │   │   ├── gemini.py
+│   │   │   ├── glm.py
+│   │   │   ├── gpt.py
+│   │   │   └── qwen.py
+│   │   ├── requirements.txt
+│   │   ├── system_prompt_v1.md
+│   │   ├── system_prompt_v1_EN.md
+│   │   ├── system_prompt_v2.md
+│   │   ├── system_prompt_v2_EN.md
+│   │   ├── system_prompt_v3.md
+│   │   └── util
+│   │       ├── __init__.py
+│   │       ├── __pycache__
+│   │       │   ├── __init__.cpython-311.pyc
+│   │       │   ├── data_loader.cpython-311.pyc
+│   │       │   ├── logger.cpython-311.pyc
+│   │       │   └── prompt_loader.cpython-311.pyc
+│   │       ├── data_loader.py
+│   │       ├── logger.py
+│   │       └── prompt_loader.py
+│   ├── trans_process.py
+│   ├── upload_modelscope.py
+│   ├── upload_openxlab.py
+│   └── xtuner2sharegpt.py
+├── setup.py
+├── structure.txt
+├── swift
+│   ├── README.md
+│   ├── README_EN.md
+│   ├── data
+│   │   └── aiwei.jsonl
+│   └── src
+│       ├── revert.py
+│       └── upload
+│           ├── upload_modelscope.py
+│           └── upload_openxlab.py
+├── web_demo-Llama3.py
+├── web_demo-aiwei.py
+├── web_internlm2.py
+├── web_internlm2_5.py
+├── xtuner_config
+│   ├── ChatGLM3-6b-ft.md
+│   ├── ChatGLM3-6b-ft_EN.md
+│   ├── Meta-Llama3_1-8B_Instruct_qlora_alpaca_e3_ruozhi_sc_full.py
+│   ├── Qwen2-7B-Instruct_lora.py
+│   ├── README.md
+│   ├── README_EN.md
+│   ├── README_internlm2_7b_base_qlora.md
+│   ├── README_llama3_8b_instruct_qlora_alpaca_e3_M.md
+│   ├── README_scientist.md
+│   ├── airen-internlm2_chat_7b_qlora.py
+│   ├── aiwei-internlm2_chat_7b_qlora.py
+│   ├── aiwei_llama3_8b_instruct_qlora_e3.py
+│   ├── baichuan2_13b_chat_qlora_alpaca_e3.py
+│   ├── chatglm3_6b_lora_alpaca_e3.py
+│   ├── deepseek_moe_16b_chat_qlora_oasst1_e3.py
+│   ├── images
+│   │   ├── README.md
+│   │   ├── README_EN.md
+│   │   ├── autodl.png
+│   │   └── internstudio.png
+│   ├── internlm2_1_8b_full_alpaca_e3.py
+│   ├── internlm2_20b_chat_lora_alpaca_e3.py
+│   ├── internlm2_5_chat_7b_full.py
+│   ├── internlm2_5_chat_7b_qlora_oasst1_e3.py
+│   ├── internlm2_7b_base_qlora_e10_M_1e4_32_64.py
+│   ├── internlm2_7b_base_qlora_e10_b8_16_32.py
+│   ├── internlm2_7b_base_qlora_e3.py
+│   ├── internlm2_7b_base_qlora_e3_M_1e4_32_64.py
+│   ├── internlm2_7b_chat_qlora_e3.py
+│   ├── internlm2_7b_chat_qlora_e3_mother.py
+│   ├── internlm2_7b_chat_qlora_e3_scienctist.py
+│   ├── internlm2_chat_7b_full.py
+│   ├── internlm2_chat_7b_full_finetune_custom_dataset_e1.py
+│   ├── llama3_8b_instruct_qlora_alpaca_e3_M.py
+│   ├── llama3_8b_instruct_qlora_alpaca_e3_M_ruozhi_scM.py
+│   ├── mixtral_8x7b_instruct_qlora_oasst1_e3.py
+│   ├── pt
+│   │   ├── README.md
+│   │   ├── ft2pt.py
+│   │   └── internlm2_chat_1_8b_qlora_e3_pt.py
+│   ├── qwen1_5_0_5_B_full.py
+│   ├── qwen_7b_chat_qlora_e3.py
+│   ├── requirements.txt
+│   └── upload_modelscope.py
+└── 方案.md
+
+105 directories, 572 files

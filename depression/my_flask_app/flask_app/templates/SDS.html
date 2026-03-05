@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测评进行中 - SDS 抑郁自评与辅助分析系统</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;600;700&family=Inter:wght@400;500;600&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { DEFAULT: '#3B82F6', hover: '#2563EB', light: '#EFF6FF' },
+                        slate: { 50: '#F8FAFC', 100: '#F1F5F9', 200: '#E2E8F0', 300: '#CBD5E1', 400: '#94A3B8', 500: '#64748B', 600: '#475569', 700: '#334155', 800: '#1E293B', 900: '#0F172A' },
+                    },
+                    fontFamily: {
+                        sans: ['"Inter"', '"Noto Sans SC"', 'sans-serif'], 
+                        serif: ['"Playfair Display"', 'serif'],
+                    },
+                    boxShadow: {
+                        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.05)',
+                        'card': '0 10px 40px -10px rgba(0, 0, 0, 0.05)',
+                        'card-hover': '0 20px 40px -5px rgba(59, 130, 246, 0.08), 0 0 0 1px rgba(59, 130, 246, 0.1)',
+                        'glow': '0 0 20px rgba(59, 130, 246, 0.15)',
+                        'option-active': '0 4px 12px rgba(59, 130, 246, 0.15), 0 0 0 2px #3B82F6',
+                        'inner-text': 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
+                    },
+                    animation: {
+                        'float': 'float 8s ease-in-out infinite',
+                        'float-slow': 'float 12s ease-in-out infinite',
+                        'float-slower': 'float 18s ease-in-out infinite',
+                        'float-reverse': 'float-reverse 10s ease-in-out infinite',
+                        'float-reverse-slow': 'float-reverse 15s ease-in-out infinite',
+                        'float-reverse-slower': 'float-reverse 20s ease-in-out infinite',
+                        'float-huge': 'float-huge 20s ease-in-out infinite',
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'meander': 'meander 5s ease-in-out infinite',
+                        'meander-fast': 'meander 3.3s ease-in-out infinite',
+                        'meander-reverse': 'meander-reverse 6s ease-in-out infinite',
+                        'meander-slow': 'meander 7s ease-in-out infinite',
+                        'wave': 'wave 1.5s ease-in-out infinite',
+                        'scan': 'scan 3s linear infinite',
+                        'breathe': 'breathe 4s ease-in-out infinite',
+                        'cursor': 'cursor 1s step-end infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translate(0, 0)' },
+                            '50%': { transform: 'translate(0, -20px)' },
+                        },
+                        'float-reverse': {
+                            '0%, 100%': { transform: 'translate(0, 0)' },
+                            '50%': { transform: 'translate(0, 20px)' },
+                        },
+                        meander: {
+                            '0%, 100%': { transform: 'translate(0, 0)' },
+                            '25%': { transform: 'translate(150px, -150px)' },
+                            '50%': { transform: 'translate(-90px, 210px)' },
+                            '75%': { transform: 'translate(-210px, -90px)' },
+                        },
+                        'meander-reverse': {
+                            '0%, 100%': { transform: 'translate(0, 0)' },
+                            '25%': { transform: 'translate(-150px, 150px)' },
+                            '50%': { transform: 'translate(90px, -210px)' },
+                            '75%': { transform: 'translate(210px, 90px)' },
+                        },
+                        wave: {
+                            '0%, 100%': { height: '8px' },
+                            '50%': { height: '24px' },
+                        },
+                        scan: {
+                            '0%': { top: '0%', opacity: 0 },
+                            '10%': { opacity: 1 },
+                            '90%': { opacity: 1 },
+                            '100%': { top: '100%', opacity: 0 },
+                        },
+                        cursor: {
+                            '0%, 100%': { opacity: 1 },
+                            '50%': { opacity: 0 },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        .bg-noise {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 50; opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+        body {
+            background-color: #F8FAFC;
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(219, 234, 254, 0.4) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(254, 243, 199, 0.3) 0%, transparent 50%);
+            min-height: 100vh;
+        }
+
+        .glass-panel {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.85) 100%);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ambient-sphere { position: absolute; border-radius: 50%; pointer-events: none; z-index: 0; }
+        
+        .pattern-dots {
+            background-image: radial-gradient(#94A3B8 1px, transparent 1px);
+            background-size: 20px 20px;
+            opacity: 0.15;
+            position: absolute; inset: 0; pointer-events: none; z-index: 0;
+        }
+
+        .dynamic-bubble {
+            position: fixed; border-radius: 50%; pointer-events: none; z-index: 1;
+        }
+
+        /* 录音波浪 */
+        .voice-bar {
+            width: 4px;
+            background-color: #3B82F6;
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+        }
+        .voice-bar:nth-child(odd) { animation-duration: 0.8s; background-color: #60A5FA; }
+        .voice-bar:nth-child(2n) { animation-duration: 1.1s; }
+        .voice-bar:nth-child(3n) { animation-duration: 1.3s; background-color: #93C5FD; }
+
+        /* 摄像头扫描线 */
+        .scan-line {
+            position: absolute; left: 0; width: 100%; height: 2px;
+            background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.8), transparent);
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.8);
+            animation: scan 3s linear infinite;
+        }
+
+        /* 水印 */
+        .watermark {
+            position: absolute; opacity: 0.03; pointer-events: none;
+        }
+
+        /* 卡片内部悬浮球样式 */
+        .inner-bubble {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 0;
+            filter: blur(3px);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="text-slate-700 font-sans antialiased relative h-screen flex flex-col overflow-hidden">
+
+    <!-- 1. 全局氛围背景 (复用登录页逻辑) -->
+    <div class="bg-noise"></div>
+    <!-- 大光斑 (模糊底色) -->
+    <div class="ambient-sphere w-[600px] h-[600px] -top-32 -left-32 bg-blue-100/40 blur-[80px] animate-float-slow fixed"></div>
+    <div class="ambient-sphere w-[500px] h-[500px] top-0 -right-20 bg-orange-50/40 animate-float fixed"></div>
+    <div class="ambient-sphere w-[400px] h-[400px] bottom-0 left-1/3 bg-indigo-50/30 animate-float-slow fixed"></div>
+    
+    <!-- 漂浮泡泡容器 (JS生成) -->
+    <div id="bubble-container" class="fixed inset-0 pointer-events-none overflow-hidden z-0"></div>
+
+
+    <!-- 2. 顶部状态栏 -->
+    <header class="relative z-50 px-6 py-4 flex items-center justify-between bg-white/30 backdrop-blur-sm border-b border-white/40">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+                <h1 class="font-bold text-slate-800 text-lg leading-none tracking-tight">SDS 测评</h1>
+                <p class="text-[10px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">Assessment in Progress</p>
+            </div>
+        </div>
+
+        <!-- 进度条 (优化版) -->
+        <div class="flex-1 max-w-xl mx-8 hidden md:block group">
+            <div class="flex justify-between text-xs font-semibold text-slate-500 mb-2">
+                <span class="group-hover:text-blue-600 transition-colors">测评进度</span>
+                <span class="text-blue-600 font-mono">05 / 20</span>
+            </div>
+            <div class="w-full bg-slate-200/60 h-2 rounded-full overflow-hidden backdrop-blur-sm">
+                <div class="bg-gradient-to-r from-blue-400 to-indigo-500 h-2 rounded-full w-1/4 transition-all duration-700 ease-out shadow-[0_0_12px_rgba(59,130,246,0.6)] relative">
+                    <!-- 进度条末端光点 -->
+                    <div class="absolute right-0 top-0 h-2 w-2 bg-white rounded-full opacity-50 animate-pulse"></div>
+                </div>
+            </div>
+        </div>
+
+        <button class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/60 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-all text-sm font-semibold shadow-sm hover:shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            暂存退出
+        </button>
+    </header>
+
+    <!-- 主体内容区：响应式栅格布局 (Grid Layout) -->
+    <!-- 
+      核心修改：使用 grid-cols-12 布局 
+      左侧内容：lg:col-span-8 xl:col-span-9 (约70%-75%)
+      右侧监测：lg:col-span-4 xl:col-span-3 (约25%-30%)
+      间距：gap-6 lg:gap-8
+      容器：w-full (全宽) 配合 responsive padding
+    -->
+    <main class="flex-1 relative z-10 w-full px-4 sm:px-6 lg:px-8 xl:px-12 py-6 overflow-hidden">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 h-full">
+            
+            <!-- 左侧：沉浸式答题区 -->
+            <section class="lg:col-span-8 xl:col-span-9 relative min-w-0 h-full">
+                
+                <div class="glass-panel rounded-[32px] p-8 md:p-12 xl:p-14 shadow-card relative flex flex-col h-full overflow-hidden group">
+                    <div class="pattern-dots"></div>
+                    
+                    <!-- 卡片内氛围泡泡 (30个) -->
+                    <div class="inner-bubble w-72 h-72 -top-20 -right-20 bg-orange-100/50 animate-meander blur-md"></div>
+                    <div class="inner-bubble w-56 h-56 bottom-0 left-20 bg-blue-100/40 animate-meander-reverse blur-none"></div>
+                    <div class="inner-bubble w-40 h-40 top-1/2 right-1/3 bg-indigo-100/45 animate-float opacity-70 blur-sm"></div>
+                    <div class="inner-bubble w-64 h-64 top-10 left-10 bg-rose-100/35 animate-meander-fast blur-xl"></div>
+                    <div class="inner-bubble w-32 h-32 bottom-20 right-1/4 bg-teal-100/40 animate-meander-slow blur-none"></div>
+                    <div class="inner-bubble w-48 h-48 top-1/3 left-1/2 bg-purple-100/30 animate-meander-reverse blur-lg"></div>
+                    <div class="inner-bubble w-28 h-28 bottom-1/3 left-1/4 bg-amber-100/45 animate-float-slow blur-sm"></div>
+                    <div class="inner-bubble w-52 h-52 top-20 right-1/2 bg-cyan-100/35 animate-meander blur-none"></div>
+                    <div class="inner-bubble w-36 h-36 bottom-10 right-10 bg-lime-100/40 animate-meander-fast blur-lg"></div>
+                    <div class="inner-bubble w-44 h-44 top-1/4 left-1/3 bg-fuchsia-100/30 animate-float-reverse blur-xl"></div>
+                    <div class="inner-bubble w-24 h-24 top-2/3 right-1/4 bg-emerald-100/50 animate-meander-reverse blur-none"></div>
+                    <div class="inner-bubble w-60 h-60 bottom-1/4 left-1/2 bg-pink-100/35 animate-meander-slow blur-md"></div>
+                    <div class="inner-bubble w-20 h-20 top-1/2 left-1/4 bg-sky-100/45 animate-float blur-lg"></div>
+                    <div class="inner-bubble w-68 h-68 bottom-5 right-1/3 bg-violet-100/30 animate-meander blur-xl"></div>
+                    <div class="inner-bubble w-30 h-30 top-40 left-40 bg-orange-50/40 animate-meander-fast blur-none"></div>
+                    <div class="inner-bubble w-50 h-50 bottom-40 right-20 bg-blue-50/35 animate-float-slow blur-md"></div>
+                    <div class="inner-bubble w-38 h-38 top-3/4 left-1/2 bg-indigo-50/45 animate-meander-reverse blur-lg"></div>
+                    <div class="inner-bubble w-42 h-42 bottom-1/2 right-1/4 bg-rose-50/30 animate-meander blur-none"></div>
+                    <div class="inner-bubble w-26 h-26 top-1/3 right-2/3 bg-teal-50/50 animate-float-reverse blur-sm"></div>
+                    <div class="inner-bubble w-54 h-54 bottom-2/3 left-1/3 bg-purple-50/35 animate-meander-slow blur-md"></div>
+                    <div class="inner-bubble w-34 h-34 top-1/4 right-1/2 bg-amber-50/40 animate-meander-fast blur-none"></div>
+                    <div class="inner-bubble w-46 h-46 bottom-1/4 left-2/3 bg-cyan-50/45 animate-float blur-xl"></div>
+                    <div class="inner-bubble w-22 h-22 top-2/3 left-1/4 bg-lime-50/30 animate-meander-reverse blur-sm"></div>
+                    <div class="inner-bubble w-58 h-58 bottom-1/3 right-2/3 bg-fuchsia-50/50 animate-meander blur-none"></div>
+                    <div class="inner-bubble w-32 h-32 top-10 left-2/3 bg-emerald-50/35 animate-float-slow blur-lg"></div>
+                    <div class="inner-bubble w-48 h-48 bottom-20 right-1/3 bg-pink-50/40 animate-meander-slow blur-xl"></div>
+                    <div class="inner-bubble w-28 h-28 top-1/2 right-1/4 bg-sky-50/45 animate-meander-fast blur-none"></div>
+                    <div class="inner-bubble w-52 h-52 bottom-10 left-1/4 bg-violet-50/30 animate-float-reverse blur-md"></div>
+                    <div class="inner-bubble w-40 h-40 top-1/3 right-1/3 bg-red-50/50 animate-meander-reverse blur-lg"></div>
+                    <div class="inner-bubble w-36 h-36 bottom-1/2 left-1/2 bg-yellow-50/35 animate-meander blur-none"></div>
+                    
+                    <!-- 装饰：左上角巨型引号 -->
+                    <div class="absolute top-8 left-8 text-blue-100/50 font-serif text-[120px] leading-none select-none pointer-events-none -translate-y-8 -translate-x-4">“</div>
+
+                    <!-- 装饰：右下角抽象图形 -->
+                    <div class="absolute -bottom-20 -right-20 w-80 h-80 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
+                    <svg class="absolute bottom-0 right-0 w-64 h-64 text-slate-50/80 transform translate-x-10 translate-y-10 pointer-events-none" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M44.7,-76.4C58.9,-69.2,71.8,-59.1,81.6,-46.6C91.4,-34.1,98.2,-19.2,95.8,-5.2C93.5,8.9,82,22.1,70.9,33.1C59.8,44.1,49.1,52.9,37.6,58.8C26.1,64.7,13.8,67.7,0.8,66.3C-12.2,64.9,-25.6,59.1,-37.9,51.8C-50.2,44.5,-61.4,35.7,-69.3,24.4C-77.2,13.1,-81.8,-0.7,-78.4,-13.2C-75,-25.7,-63.6,-36.9,-51.7,-44.6C-39.8,-52.3,-27.4,-56.5,-15.3,-60.9C-3.2,-65.3,8.6,-69.9,20.8,-74.3" transform="translate(100 100)" />
+                    </svg>
+
+                    <!-- 装饰：左侧边缘线条 -->
+                    <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-32 bg-gradient-to-b from-transparent via-blue-200 to-transparent opacity-50"></div>
+                    
+                    <!-- 题目内容区 (左右分栏布局) -->
+                    <div class="relative z-10 flex-grow flex items-center gap-8 xl:gap-16">
+                        
+                        <!-- 左侧：答题区 (占一半) -->
+                        <div class="flex-1 flex flex-col justify-center xl:pr-8">
+                            <div class="mb-8 relative">
+                                <div class="flex items-center gap-4 mb-6">
+                                    <span class="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold tracking-wider shadow-sm">
+                                        <span class="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
+                                        QUESTION 05
+                                    </span>
+                                    <div class="h-px flex-grow bg-gradient-to-r from-blue-100 to-transparent"></div>
+                                </div>
+                                
+                                <h2 class="text-2xl md:text-3xl lg:text-4xl font-bold text-slate-800 leading-tight relative">
+                                    <span class="absolute -left-6 top-0 w-1 h-full bg-blue-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 hidden lg:block"></span>
+                                    我觉得一天之中<br>
+                                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600 relative">
+                                        早晨最好。
+                                        <svg class="absolute -bottom-2 left-0 w-full h-2 text-blue-200/50 -z-10" viewBox="0 0 100 10" preserveAspectRatio="none"><path d="M0 5 Q 50 10 100 5" stroke="currentColor" stroke-width="2" fill="none" /></svg>
+                                    </span>
+                                </h2>
+                            </div>
+
+                            <!-- 选项组 -->
+                            <div class="grid grid-cols-1 gap-4 w-full">
+                                <!-- Option A -->
+                                <label class="relative flex items-center p-5 rounded-2xl border border-slate-200 bg-white/60 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md cursor-pointer transition-all duration-200 group">
+                                    <input type="radio" name="answer" class="peer sr-only">
+                                    <div class="w-5 h-5 rounded-full border-2 border-slate-300 peer-checked:border-blue-500 peer-checked:bg-blue-500 flex items-center justify-center transition-all group-hover:scale-110 shrink-0">
+                                        <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                    <span class="ml-3 font-serif font-bold text-slate-400 text-xl group-hover:text-blue-500 transition-colors peer-checked:text-blue-600">A.</span>
+                                    <span class="ml-2 text-base lg:text-lg text-slate-600 font-medium group-hover:text-slate-800 peer-checked:text-blue-700 transition-colors">没有或很少时间</span>
+                                    <div class="absolute inset-0 bg-blue-500/5 rounded-2xl opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"></div>
+                                </label>
+
+                                <!-- Option B -->
+                                <label class="relative flex items-center p-5 rounded-2xl border border-slate-200 bg-white/60 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md cursor-pointer transition-all duration-200 group">
+                                    <input type="radio" name="answer" class="peer sr-only">
+                                    <div class="w-5 h-5 rounded-full border-2 border-slate-300 peer-checked:border-blue-500 peer-checked:bg-blue-500 flex items-center justify-center transition-all group-hover:scale-110 shrink-0">
+                                        <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                    <span class="ml-3 font-serif font-bold text-slate-400 text-xl group-hover:text-blue-500 transition-colors peer-checked:text-blue-600">B.</span>
+                                    <span class="ml-2 text-base lg:text-lg text-slate-600 font-medium group-hover:text-slate-800 peer-checked:text-blue-700 transition-colors">小部分时间</span>
+                                    <div class="absolute inset-0 bg-blue-500/5 rounded-2xl opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"></div>
+                                </label>
+
+                                <!-- Option C -->
+                                <label class="relative flex items-center p-5 rounded-2xl border border-slate-200 bg-white/60 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md cursor-pointer transition-all duration-200 group">
+                                    <input type="radio" name="answer" class="peer sr-only">
+                                    <div class="w-5 h-5 rounded-full border-2 border-slate-300 peer-checked:border-blue-500 peer-checked:bg-blue-500 flex items-center justify-center transition-all group-hover:scale-110 shrink-0">
+                                        <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                    <span class="ml-3 font-serif font-bold text-slate-400 text-xl group-hover:text-blue-500 transition-colors peer-checked:text-blue-600">C.</span>
+                                    <span class="ml-2 text-base lg:text-lg text-slate-600 font-medium group-hover:text-slate-800 peer-checked:text-blue-700 transition-colors">相当多时间</span>
+                                    <div class="absolute inset-0 bg-blue-500/5 rounded-2xl opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"></div>
+                                </label>
+
+                                <!-- Option D -->
+                                <label class="relative flex items-center p-5 rounded-2xl border border-slate-200 bg-white/60 hover:border-blue-400 hover:bg-blue-50/50 hover:shadow-md cursor-pointer transition-all duration-200 group">
+                                    <input type="radio" name="answer" class="peer sr-only">
+                                    <div class="w-5 h-5 rounded-full border-2 border-slate-300 peer-checked:border-blue-500 peer-checked:bg-blue-500 flex items-center justify-center transition-all group-hover:scale-110 shrink-0">
+                                        <svg class="w-3 h-3 text-white hidden peer-checked:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </div>
+                                    <span class="ml-3 font-serif font-bold text-slate-400 text-xl group-hover:text-blue-500 transition-colors peer-checked:text-blue-600">D.</span>
+                                    <span class="ml-2 text-base lg:text-lg text-slate-600 font-medium group-hover:text-slate-800 peer-checked:text-blue-700 transition-colors">绝大部分时间</span>
+                                    <div class="absolute inset-0 bg-blue-500/5 rounded-2xl opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- 右侧：AI 插图 (占另一半) -->
+                        <div class="hidden xl:flex flex-1 items-center justify-center h-full overflow-hidden relative">
+                            <img src="1.png" alt="AI Mental Health" class="w-[120%] h-[120%] object-contain opacity-95" style="mask-image: radial-gradient(ellipse 80% 70% at center, black 40%, transparent 100%); -webkit-mask-image: radial-gradient(ellipse 80% 70% at center, black 40%, transparent 100%);">
+                        </div>
+
+                    </div>
+
+                    <!-- 底部交互栏 (New Layout) -->
+                    <div class="relative z-10 mt-auto border-t border-slate-200/50 pt-6">
+                        <div class="flex flex-col xl:flex-row items-center gap-5">
+                            
+                            <!-- Voice Button -->
+                            <div class="flex items-center gap-4 shrink-0 p-1.5 pr-5 rounded-full bg-white/40 border border-white/60 shadow-sm backdrop-blur-md hover:bg-white/60 transition-all cursor-pointer group/voice">
+                                <button class="w-11 h-11 rounded-full bg-gradient-to-r from-rose-400 to-orange-400 text-white flex items-center justify-center shadow-lg group-hover/voice:scale-105 transition-transform animate-pulse-slow">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                                </button>
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider group-hover/voice:text-rose-500 transition-colors">Voice Answer</span>
+                                    <div class="flex items-end gap-0.5 h-3 mt-0.5">
+                                        <div class="voice-bar h-1.5 w-0.5"></div>
+                                        <div class="voice-bar h-2.5 w-0.5"></div>
+                                        <div class="voice-bar h-3 w-0.5"></div>
+                                        <div class="voice-bar h-1.5 w-0.5"></div>
+                                        <span class="text-[10px] text-slate-400 ml-1.5 font-medium">Listening...</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Transcript (Middle) -->
+                            <div class="w-full xl:flex-1 bg-slate-50/50 border border-slate-200/60 rounded-xl p-3 flex items-center gap-3 shadow-inner-text group transition-colors hover:bg-white/60 min-h-[60px]">
+                                 <div class="shrink-0 flex items-center gap-2">
+                                     <span class="flex h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+                                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider hidden sm:block">Transcript</span>
+                                 </div>
+                                 <p class="text-slate-600 text-sm leading-relaxed border-l-2 border-slate-200 pl-3 font-medium line-clamp-2 w-full">
+                                     <span class="text-slate-300 italic mr-1">"</span>
+                                     我觉得大部分时间还是比较有精神的...
+                                     <span class="inline-block w-1 h-3 align-middle bg-slate-400 ml-0.5 animate-cursor"></span>
+                                 </p>
+                            </div>
+
+                            <!-- Navigation Buttons (Right) -->
+                            <div class="flex gap-3 shrink-0 ml-auto xl:ml-0">
+                                <button class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white/50 text-slate-500 font-semibold hover:bg-white hover:text-slate-700 transition-all shadow-sm text-sm">
+                                    上一题
+                                </button>
+                                <button class="px-6 py-2.5 rounded-xl bg-slate-900 text-white font-semibold shadow-lg hover:bg-slate-800 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm">
+                                    下一题
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 右侧：多模态监测岛 (Grid Layout for proportional width) -->
+            <aside class="lg:col-span-4 xl:col-span-3 flex flex-col gap-5 relative z-20 shrink-0 h-full overflow-hidden">
+                
+                <!-- 标题 -->
+                <div class="flex items-center justify-between px-2 mb-1 shrink-0">
+                    <div class="flex items-center gap-2">
+                        <span class="relative flex h-2.5 w-2.5">
+                          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                        </span>
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Live Monitoring</span>
+                    </div>
+                </div>
+
+                <!-- 1. 摄像头 (Video Feed) - 自动高度适应 -->
+                <div class="glass-panel rounded-2xl p-1 overflow-hidden relative group hover:shadow-card-hover transition-all duration-500 shrink-0">
+                    <!-- 卡片内氛围泡泡 (8个小气泡) -->
+                    <div class="inner-bubble w-32 h-32 -top-5 -right-5 bg-blue-100/40 animate-float-slow blur-md"></div>
+                    <div class="inner-bubble w-20 h-20 bottom-5 left-5 bg-cyan-100/35 animate-meander blur-none"></div>
+                    <div class="inner-bubble w-28 h-28 top-1/2 right-1/3 bg-indigo-100/45 animate-meander-fast blur-lg"></div>
+                    <div class="inner-bubble w-24 h-24 bottom-1/3 left-1/2 bg-sky-100/30 animate-float-reverse blur-none"></div>
+                    <div class="inner-bubble w-16 h-16 top-1/4 left-1/4 bg-teal-100/50 animate-meander-reverse blur-sm"></div>
+                    <div class="inner-bubble w-36 h-36 bottom-10 right-1/4 bg-blue-50/35 animate-meander-slow blur-none"></div>
+                    <div class="inner-bubble w-22 h-22 top-3/4 right-1/2 bg-purple-100/40 animate-float blur-lg"></div>
+                    <div class="inner-bubble w-30 h-30 bottom-20 left-1/3 bg-violet-100/45 animate-meander blur-xl"></div>
+                    
+                    <div class="absolute top-3 left-3 z-10 px-2 py-1 bg-black/40 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-2">
+                        <div class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>
+                        <span class="text-[10px] text-white/90 font-medium tracking-wide">REC</span>
+                    </div>
+                    
+                    <div class="w-full aspect-video bg-slate-800 rounded-xl relative overflow-hidden">
+                        <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=80" alt="Camera" class="w-full h-full object-cover opacity-60 mix-blend-overlay">
+                        <div class="scan-line"></div>
+                        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-24 h-28 border border-blue-400/40 rounded-xl transition-all duration-300 group-hover:border-blue-400/80 group-hover:scale-105">
+                            <div class="absolute -top-px -left-px w-3 h-3 border-t-2 border-l-2 border-blue-400 rounded-tl-lg"></div>
+                            <div class="absolute -top-px -right-px w-3 h-3 border-t-2 border-r-2 border-blue-400 rounded-tr-lg"></div>
+                            <div class="absolute -bottom-px -left-px w-3 h-3 border-b-2 border-l-2 border-blue-400 rounded-bl-lg"></div>
+                            <div class="absolute -bottom-px -right-px w-3 h-3 border-b-2 border-r-2 border-blue-400 rounded-br-lg"></div>
+                        </div>
+                        <div class="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-blue-500/80 backdrop-blur-sm rounded-full text-[10px] text-white font-mono shadow-lg">
+                            Neutral: 85%
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 脑电波 (EEG) - Expanded for 3 Channels -->
+                <div class="glass-panel rounded-2xl p-5 relative group hover:shadow-card-hover transition-all duration-300 flex-1 flex flex-col min-h-0">
+                    <!-- 卡片内氛围泡泡 (10个) -->
+                    <div class="inner-bubble w-40 h-40 -top-10 -right-10 bg-indigo-100/45 animate-float-slow blur-none"></div>
+                    <div class="inner-bubble w-32 h-32 bottom-0 left-0 bg-blue-100/35 animate-meander blur-lg"></div>
+                    <div class="inner-bubble w-24 h-24 top-1/3 right-1/4 bg-purple-100/40 animate-meander-fast blur-none"></div>
+                    <div class="inner-bubble w-36 h-36 bottom-1/4 left-1/3 bg-violet-100/30 animate-float-reverse blur-xl"></div>
+                    <div class="inner-bubble w-28 h-28 top-1/2 left-1/2 bg-cyan-100/50 animate-meander-reverse blur-md"></div>
+                    <div class="inner-bubble w-20 h-20 bottom-1/3 right-1/3 bg-sky-100/35 animate-meander-slow blur-none"></div>
+                    <div class="inner-bubble w-44 h-44 top-10 left-10 bg-indigo-50/45 animate-float blur-xl"></div>
+                    <div class="inner-bubble w-26 h-26 bottom-20 right-20 bg-blue-50/40 animate-meander blur-sm"></div>
+                    <div class="inner-bubble w-38 h-38 top-2/3 right-1/2 bg-teal-100/30 animate-meander-fast blur-none"></div>
+                    <div class="inner-bubble w-22 h-22 bottom-1/2 left-1/4 bg-purple-50/50 animate-float-slow blur-lg"></div>
+                    
+                    <div class="flex justify-between items-center mb-3 shrink-0 relative z-10">
+                        <div class="flex items-center gap-2">
+                            <div class="p-1.5 rounded-lg bg-indigo-50 text-indigo-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600">Multi-Channel EEG</span>
+                        </div>
+                        <span class="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100 font-mono">Stable</span>
+                    </div>
+                    
+                    <!-- Channel 1: FP1 -->
+                    <div class="flex-1 w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner mb-2 z-10">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">FP1</div>
+                        <canvas id="eegCanvas1" class="w-full h-full"></canvas>
+                    </div>
+                    
+                    <!-- Channel 2: FP2 -->
+                    <div class="flex-1 w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner mb-2 z-10">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">FP2</div>
+                        <canvas id="eegCanvas2" class="w-full h-full"></canvas>
+                    </div>
+
+                    <!-- Channel 3: CZ -->
+                    <div class="flex-1 w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner z-10">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">CZ</div>
+                        <canvas id="eegCanvas3" class="w-full h-full"></canvas>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 mt-3 shrink-0 relative z-10">
+                        <div class="text-center">
+                            <p class="text-[9px] text-slate-400 uppercase">Alpha</p>
+                            <p class="text-xs font-bold text-indigo-600 font-mono">12 Hz</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-[9px] text-slate-400 uppercase">Beta</p>
+                            <p class="text-xs font-bold text-blue-600 font-mono">18 Hz</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-[9px] text-slate-400 uppercase">Theta</p>
+                            <p class="text-xs font-bold text-purple-600 font-mono">6 Hz</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 语音频谱 (Spectrum) -->
+                <div class="glass-panel rounded-2xl p-5 relative hover:shadow-card-hover transition-all duration-300 shrink-0">
+                    <!-- 卡片内氛围泡泡 (12个) -->
+                    <div class="inner-bubble w-40 h-40 top-0 right-0 bg-rose-100/40 animate-meander-fast blur-none"></div>
+                    <div class="inner-bubble w-28 h-28 bottom-5 left-5 bg-orange-100/35 animate-float-reverse blur-lg"></div>
+                    <div class="inner-bubble w-24 h-24 top-1/2 right-1/3 bg-pink-100/45 animate-meander blur-sm"></div>
+                    <div class="inner-bubble w-36 h-36 bottom-1/3 left-1/2 bg-red-100/30 animate-float-slow blur-none"></div>
+                    <div class="inner-bubble w-32 h-32 top-1/4 left-1/4 bg-amber-100/50 animate-meander-reverse blur-md"></div>
+                    <div class="inner-bubble w-20 h-20 bottom-1/2 right-1/4 bg-yellow-100/35 animate-meander-slow blur-lg"></div>
+                    <div class="inner-bubble w-44 h-44 top-10 right-1/2 bg-rose-50/40 animate-float blur-none"></div>
+                    <div class="inner-bubble w-26 h-26 bottom-10 left-1/3 bg-orange-50/45 animate-meander-fast blur-sm"></div>
+                    <div class="inner-bubble w-38 h-38 top-2/3 right-1/4 bg-pink-50/30 animate-meander blur-md"></div>
+                    <div class="inner-bubble w-22 h-22 bottom-20 left-1/4 bg-red-50/50 animate-float-reverse blur-none"></div>
+                    <div class="inner-bubble w-34 h-34 top-1/3 right-2/3 bg-amber-50/35 animate-meander-reverse blur-xl"></div>
+                    <div class="inner-bubble w-30 h-30 bottom-1/4 left-2/3 bg-yellow-50/40 animate-float-slow blur-sm"></div>
+                    
+                    <div class="flex justify-between items-center mb-3 relative z-10">
+                        <div class="flex items-center gap-2">
+                            <div class="p-1.5 rounded-lg bg-rose-50 text-rose-500">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                            </div>
+                            <span class="text-xs font-bold text-slate-600">Voice Tone</span>
+                        </div>
+                        <span class="text-[10px] text-slate-400 animate-pulse">Monitoring...</span>
+                    </div>
+                    <div class="flex items-center justify-center gap-1.5 bg-white/50 rounded-xl border border-slate-100 shadow-inner h-16 relative z-10">
+                        <div class="w-1.5 bg-rose-300 h-6 rounded-full animate-wave"></div>
+                        <div class="w-1.5 bg-rose-400 h-10 rounded-full animate-wave" style="animation-delay: 0.1s"></div>
+                        <div class="w-1.5 bg-rose-500 h-8 rounded-full animate-wave" style="animation-delay: 0.2s"></div>
+                        <div class="w-1.5 bg-rose-600 h-12 rounded-full animate-wave" style="animation-delay: 0.3s"></div>
+                        <div class="w-1.5 bg-rose-500 h-10 rounded-full animate-wave" style="animation-delay: 0.4s"></div>
+                        <div class="w-1.5 bg-rose-400 h-7 rounded-full animate-wave" style="animation-delay: 0.5s"></div>
+                        <div class="w-1.5 bg-rose-300 h-4 rounded-full animate-wave" style="animation-delay: 0.6s"></div>
+                    </div>
+                </div>
+
+            </aside>
+
+        </div>
+    </main>
+
+    <script>
+        // 1. EEG Canvas Animation (3 Channels)
+        const canvases = [
+            document.getElementById('eegCanvas1'),
+            document.getElementById('eegCanvas2'),
+            document.getElementById('eegCanvas3')
+        ];
+        const ctxs = canvases.map(c => c.getContext('2d'));
+        
+        function resizeCanvases() {
+            canvases.forEach(canvas => {
+                if(canvas && canvas.parentElement) {
+                    canvas.width = canvas.parentElement.offsetWidth;
+                    canvas.height = canvas.parentElement.offsetHeight;
+                }
+            });
+        }
+        window.addEventListener('resize', resizeCanvases);
+        setTimeout(resizeCanvases, 100);
+
+        let offset = 0;
+        
+        function drawEEG() {
+            offset += 2;
+            
+            ctxs.forEach((ctx, index) => {
+                if(!ctx) return;
+                const canvas = canvases[index];
+                const width = canvas.width;
+                const height = canvas.height;
+                
+                ctx.clearRect(0, 0, width, height);
+                ctx.beginPath();
+                
+                // Different colors for different channels
+                const colors = ['#6366F1', '#3B82F6', '#8B5CF6']; // Indigo, Blue, Purple
+                ctx.strokeStyle = colors[index];
+                ctx.lineWidth = 2;
+                
+                for (let x = 0; x < width; x++) {
+                    // Unique wave pattern for each channel
+                    const frequency = 0.05 + (index * 0.01);
+                    const amplitude = 10 - (index * 2);
+                    const phase = offset * (1 + index * 0.2);
+                    
+                    const y = height / 2 + 
+                              Math.sin((x + phase) * frequency) * amplitude + 
+                              Math.sin((x + phase * 0.5) * 0.02) * 4;
+                              
+                    if (x === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                
+                ctx.stroke();
+                
+                // Gradient fill
+                ctx.lineTo(width, height);
+                ctx.lineTo(0, height);
+                const gradient = ctx.createLinearGradient(0, 0, 0, height);
+                gradient.addColorStop(0, colors[index] + '33'); // 20% opacity
+                gradient.addColorStop(1, colors[index] + '00'); // 0% opacity
+                ctx.fillStyle = gradient;
+                ctx.fill();
+            });
+
+            requestAnimationFrame(drawEEG);
+        }
+        drawEEG();
+
+        // 2. Dynamic Bubbles (Background)
+        function createBubbles() {
+            const container = document.getElementById('bubble-container');
+            const bubbleCount = 40;
+            const gradients = [
+                'bg-gradient-to-tr from-pink-300 to-blue-300',
+                'bg-teal-200', 'bg-blue-300', 'bg-indigo-300', 'bg-orange-200', 'bg-white'
+            ];
+            const blurs = ['blur-sm', 'blur-md', 'blur-lg'];
+            const animations = ['animate-float', 'animate-float-slow', 'animate-float-reverse'];
+
+            for (let i = 0; i < bubbleCount; i++) {
+                const bubble = document.createElement('div');
+                const size = Math.floor(Math.random() * 80) + 10;
+                const left = Math.floor(Math.random() * 100);
+                const top = Math.floor(Math.random() * 100);
+                const gradient = gradients[Math.floor(Math.random() * gradients.length)];
+                const blur = blurs[Math.floor(Math.random() * blurs.length)];
+                const animation = animations[Math.floor(Math.random() * animations.length)];
+                const opacity = (Math.random() * 0.3 + 0.05).toFixed(2);
+                const delay = (Math.random() * -20).toFixed(1) + 's';
+
+                bubble.className = `dynamic-bubble absolute rounded-full ${gradient} ${blur} ${animation}`;
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.left = `${left}%`;
+                bubble.style.top = `${top}%`;
+                bubble.style.opacity = opacity;
+                bubble.style.animationDelay = delay;
+                container.appendChild(bubble);
+            }
+        }
+        document.addEventListener('DOMContentLoaded', createBubbles);
+    </script>
+</body>
+</html>

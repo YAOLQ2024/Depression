@@ -1,0 +1,377 @@
+"""This script refers to the dialogue example of streamlit, the interactive
+generation code of chatglm2 and transformers.
+
+We mainly modified part of the code logic to adapt to the
+generation of our model.
+Please refer to these links below for more information:
+    1. streamlit chat example:
+        https://docs.streamlit.io/knowledge-base/tutorials/build-conversational-apps
+    2. chatglm2:
+        https://github.com/THUDM/ChatGLM2-6B
+    3. transformers:
+        https://github.com/huggingface/transformers
+Please run with the command `streamlit run path/to/web_demo.py
+    --server.address=0.0.0.0 --server.port 7860`.
+Using `python path/to/web_demo.py` may cause unknown problems.
+"""
+# isort: skip_file
+import copy, os
+import warnings
+from dataclasses import asdict, dataclass
+from typing import Callable, List, Optional
+
+import streamlit as st
+import torch
+from torch import nn
+from transformers.generation.utils import (LogitsProcessorList,
+                                           StoppingCriteriaList)
+from transformers.utils import logging
+
+from transformers import AutoTokenizer, AutoModelForCausalLM  # isort: skip
+
+logger = logging.get_logger(__name__)
+
+# # local
+# model_path = '/root/EmoLLM/xtuner_config/hf_safe'
+
+# Online downloading will be added later
+
+# model_path = './model/EmoLLM_PT_InternLM1_8B-chat'
+# model_path = './model/EmoLLM_Qwen1_5-0_5B-Chat_full_sft'
+model_path = './model/EmoLLM_Qwen2-7B-Instruct_lora'
+# 仅当模型目录不存在或为空时从 OpenXLab 拉取，避免覆盖已有模型
+if not os.path.isdir(model_path) or not os.path.isfile(os.path.join(model_path, "config.json")):
+    os.system(f'git clone https://code.openxlab.org.cn/chg0901/EmoLLM_V3.0.git {model_path}')
+    os.system(f'cd {model_path} && git lfs pull')
+
+@dataclass
+class GenerationConfig:
+    # this config is used for chat to provide more diversity
+    max_length: int = 32768
+    top_p: float = 0.8
+    temperature: float = 0.8
+    do_sample: bool = True
+    repetition_penalty: float = 1.005
+
+
+@torch.inference_mode()
+# 改为（✅ 支持多个）
+def generate_interactive(
+    model,
+    tokenizer,
+    prompt,
+    generation_config: Optional[GenerationConfig] = None,
+    logits_processor: Optional[LogitsProcessorList] = None,
+    stopping_criteria: Optional[StoppingCriteriaList] = None,
+    prefix_allowed_tokens_fn: Optional[Callable[[int, torch.Tensor], List[int]]] = None,
+    additional_eos_token_ids: Optional[List[int]] = None,
+    **kwargs,
+):
+    inputs = tokenizer([prompt], padding=True, return_tensors='pt')
+    input_length = len(inputs['input_ids'][0])
+
+    # ❌ 原来：for k, v in inputs.items(): inputs[k] = v.cuda()
+    # ✅ 改为：放到模型所在设备
+    device = next(model.parameters()).device
+    inputs = {k: v.to(device) for k, v in inputs.items()}
+
+    input_ids = inputs['input_ids']
+    _, input_ids_seq_length = input_ids.shape[0], input_ids.shape[-1]
+    if generation_config is None:
+        generation_config = model.generation_config
+    generation_config = copy.deepcopy(generation_config)
+    model_kwargs = generation_config.update(**kwargs)
+    bos_token_id, eos_token_id = (
+        generation_config.bos_token_id,
+        generation_config.eos_token_id,
+    )
+    # 规范成列表
+    if isinstance(eos_token_id, int) or eos_token_id is None:
+        eos_token_id = [eos_token_id] if eos_token_id is not None else []
+
+    # 合并额外的 eos id（可能有多个）
+    if additional_eos_token_ids:
+        eos_token_id = list({*eos_token_id, *additional_eos_token_ids})  # 去重
+    has_default_max_length = kwargs.get(
+        'max_length') is None and generation_config.max_length is not None
+    if has_default_max_length and generation_config.max_new_tokens is None:
+        warnings.warn(
+            f"Using 'max_length''s default \
+                ({repr(generation_config.max_length)}) \
+                to control the generation length. "
+            'This behaviour is deprecated and will be removed from the \
+                config in v5 of Transformers -- we'
+            ' recommend using `max_new_tokens` to control the maximum \
+                length of the generation.',
+            UserWarning,
+        )
+    elif generation_config.max_new_tokens is not None:
+        generation_config.max_length = generation_config.max_new_tokens + \
+            input_ids_seq_length
+        if not has_default_max_length:
+            logger.warn(  # pylint: disable=W4902
+                f"Both 'max_new_tokens' (={generation_config.max_new_tokens}) "
+                f"and 'max_length'(={generation_config.max_length}) seem to "
+                "have been set. 'max_new_tokens' will take precedence. "
+                'Please refer to the documentation for more information. '
+                '(https://huggingface.co/docs/transformers/main/'
+                'en/main_classes/text_generation)',
+                UserWarning,
+            )
+
+    if input_ids_seq_length >= generation_config.max_length:
+        input_ids_string = 'input_ids'
+        logger.warning(
+            f'Input length of {input_ids_string} is {input_ids_seq_length}, '
+            f"but 'max_length' is set to {generation_config.max_length}. "
+            'This can lead to unexpected behavior. You should consider'
+            " increasing 'max_new_tokens'.")
+
+    # 2. Set generation parameters if not already defined
+    logits_processor = logits_processor if logits_processor is not None \
+        else LogitsProcessorList()
+    stopping_criteria = stopping_criteria if stopping_criteria is not None \
+        else StoppingCriteriaList()
+
+    logits_processor = model._get_logits_processor(
+        generation_config=generation_config,
+        input_ids_seq_length=input_ids_seq_length,
+        encoder_input_ids=input_ids,
+        prefix_allowed_tokens_fn=prefix_allowed_tokens_fn,
+        logits_processor=logits_processor,
+    )
+
+    stopping_criteria = model._get_stopping_criteria(
+        generation_config=generation_config,
+        stopping_criteria=stopping_criteria)
+    logits_warper = model._get_logits_warper(generation_config)
+
+    unfinished_sequences = input_ids.new(input_ids.shape[0]).fill_(1)
+    scores = None
+    while True:
+        model_inputs = model.prepare_inputs_for_generation(
+            input_ids, **model_kwargs)
+        # forward pass to get next token
+        outputs = model(
+            **model_inputs,
+            return_dict=True,
+            output_attentions=False,
+            output_hidden_states=False,
+        )
+
+        next_token_logits = outputs.logits[:, -1, :]
+
+        # pre-process distribution
+        next_token_scores = logits_processor(input_ids, next_token_logits)
+        next_token_scores = logits_warper(input_ids, next_token_scores)
+
+        # sample
+        probs = nn.functional.softmax(next_token_scores, dim=-1)
+        if generation_config.do_sample:
+            next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
+        else:
+            next_tokens = torch.argmax(probs, dim=-1)
+
+        # update generated ids, model inputs, and length for next step
+        input_ids = torch.cat([input_ids, next_tokens[:, None]], dim=-1)
+        model_kwargs = model._update_model_kwargs_for_generation(
+            outputs, model_kwargs, is_encoder_decoder=False)
+        # ✅ 用 torch.isin 判断是否命中任一 eos
+        is_eos = torch.isin(
+            next_tokens,
+            torch.tensor(eos_token_id, device=next_tokens.device)
+        )
+        unfinished_sequences = unfinished_sequences.mul((~is_eos).long())
+
+        output_token_ids = input_ids[0].detach().cpu().tolist()
+        output_token_ids = output_token_ids[input_length:]
+
+        if output_token_ids:  # ✅ 先判空
+            last_id = output_token_ids[-1]
+            if last_id in set(eos_token_id):
+                output_token_ids = output_token_ids[:-1]
+
+        response = tokenizer.decode(output_token_ids, skip_special_tokens=True)
+
+        yield response
+        # stop when each sentence is finished
+        # or if we exceed the maximum length
+        if unfinished_sequences.max() == 0 or stopping_criteria(
+                input_ids, scores):
+            break
+
+
+def on_btn_click():
+    del st.session_state.messages
+
+
+@st.cache_resource
+def load_model():
+    # ✅ 显式设置 dtype / 设备（自动映射），兼容单/多卡或CPU回退
+    model = AutoModelForCausalLM.from_pretrained(
+        model_path,
+        trust_remote_code=True
+    ).to(torch.bfloat16)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
+    
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_path,
+        trust_remote_code=True
+    )
+    
+    # ✅ 你的策略：用 eos 作为 pad（不改词表，省去 resize_token_embeddings）
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = "right"
+
+    # ✅ 关键：让模型 config 知道 pad_token_id / eos_token_id
+    if getattr(model.config, "pad_token_id", None) is None:
+        model.config.pad_token_id = tokenizer.pad_token_id
+    if getattr(model.config, "eos_token_id", None) is None and tokenizer.eos_token_id is not None:
+        model.config.eos_token_id = tokenizer.eos_token_id
+    return model, tokenizer
+
+
+def prepare_generation_config():
+    with st.sidebar:
+         # 使用 Streamlit 的 markdown 函数添加 Markdown 文本
+        st.image('assets/EmoLLM_logo_L.png', width=1, caption='EmoLLM Logo', use_column_width=True)
+        st.markdown("[访问 EmoLLM 官方repo](https://github.com/SmartFlowAI/EmoLLM)")
+        
+        max_length = st.slider('Max Length',
+                               min_value=8,
+                               max_value=32768,
+                               value=32768)
+        top_p = st.slider('Top P', 0.0, 1.0, 0.8, step=0.01)
+        temperature = st.slider('Temperature', 0.0, 1.0, 0.7, step=0.01)
+        st.button('Clear Chat History', on_click=on_btn_click)
+
+    generation_config = GenerationConfig(max_length=max_length,
+                                         top_p=top_p,
+                                         temperature=temperature)
+
+    return generation_config
+
+
+user_prompt = '<|im_start|>user\n{user}<|im_end|>\n'
+robot_prompt = '<|im_start|>assistant\n{robot}<|im_end|>\n'
+cur_query_prompt = '<|im_start|>user\n{user}<|im_end|>\n\
+    <|im_start|>assistant\n'
+
+
+def combine_history(prompt, tokenizer):
+    """
+    用 tokenizer 的 chat_template 串历史；若模板缺失，则回退到你原有的 <|im_start|>/<|im_end|> 模板。
+    """
+    # 组装 messages（system + 历史 + 当前 user）
+    messages = []
+    meta_instruction = ('你是EmoLLM心理咨询师, 由EmoLLM团队打造, 是一个研究过无数具有心理咨询者与顶级专业心理咨询师对话的心理学教授, 在心理方面拥有广博的知识储备和丰富的研究咨询经验。你旨在通过专业心理咨询, 协助来访者完成心理诊断, 利用专业心理学知识与咨询技术一步步帮助来访者解决心理问题。如果有必要，请用“咨询者”称呼对话咨询的用户。')
+    messages.append({"role": "system", "content": meta_instruction})
+
+    for m in st.session_state.messages:
+        role = "assistant" if m["role"] == "robot" else "user"
+        messages.append({"role": role, "content": m["content"]})
+
+    messages.append({"role": "user", "content": prompt})
+
+    # 优先用 chat_template
+    try:
+        # 如权重内置模板，直接用；并在末尾加生成提示
+        prompt_text = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+        return prompt_text
+    except Exception:
+        # 模板缺失或不兼容 → 回退到你原手写模板
+        user_prompt = '<|im_start|>user\n{user}<|im_end|>\n'
+        robot_prompt = '<|im_start|>assistant\n{robot}<|im_end|>\n'
+        cur_query_prompt = '<|im_start|>user\n{user}<|im_end|>\n<|im_start|>assistant\n'
+
+        total_prompt = f'<s><|im_start|>system\n{meta_instruction}<|im_end|>\n'
+        for message in st.session_state.messages:
+            cur_content = message['content']
+            if message['role'] == 'user':
+                total_prompt += user_prompt.format(user=cur_content)
+            elif message['role'] == 'robot':
+                total_prompt += robot_prompt.format(robot=cur_content)
+        total_prompt += cur_query_prompt.format(user=prompt)
+        return total_prompt
+
+
+
+
+def main():
+    # st.markdown("我在这里，准备好倾听你的心声了。", unsafe_allow_html=True)
+    # torch.cuda.empty_cache()
+    print('load model begin.')
+    model, tokenizer = load_model()
+    print('load model end.')
+
+    user_avator = 'assets/user.png'
+    robot_avator = 'assets/EmoLLM.png'
+
+    st.title('EmoLLM V3.0 心理咨询室')
+
+    generation_config = prepare_generation_config()
+
+    # Initialize chat history
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
+
+    # Display chat messages from history on app rerun
+    for message in st.session_state.messages:
+        with st.chat_message(message['role'], avatar=message.get('avatar')):
+            st.markdown(message['content'])
+
+    # Accept user input
+    if prompt := st.chat_input('我在这里准备好倾听你的心声了~'):
+        # Display user message in chat message container
+        with st.chat_message('user', avatar=user_avator):
+            st.markdown(prompt)
+        real_prompt = combine_history(prompt, tokenizer)
+        # Add user message to chat history
+        st.session_state.messages.append({
+            'role': 'user',
+            'content': prompt,
+            'avatar': user_avator
+        })
+
+        with st.chat_message('robot', avatar=robot_avator):
+            message_placeholder = st.empty()
+            # 在调用前先准备额外 eos id 列表
+            extra_eos_tokens = ["<|im_end|>", "<|eot_id|>", "<|endoftext|>"]
+            extra_eos_ids = []
+            for t in extra_eos_tokens:
+                try:
+                    tid = tokenizer.convert_tokens_to_ids(t)
+                    if (tid is not None) and (tid != tokenizer.unk_token_id) and (tid != -1):
+                        extra_eos_ids.append(tid)
+                except Exception:
+                    pass
+
+            for cur_response in generate_interactive(
+                model=model,
+                tokenizer=tokenizer,
+                prompt=real_prompt,
+                additional_eos_token_ids=extra_eos_ids,  # ✅ 传“列表”而不是单个 id
+                **asdict(generation_config),
+            ):
+
+                # Display robot response in chat message container
+                message_placeholder.markdown(cur_response + '▌')
+            message_placeholder.markdown(cur_response)
+        # Add robot response to chat history
+        st.session_state.messages.append({
+            'role': 'robot',
+            'content': cur_response,  # pylint: disable=undefined-loop-variable
+            'avatar': robot_avator,
+        })
+        torch.cuda.empty_cache()
+
+
+if __name__ == '__main__':
+    main()

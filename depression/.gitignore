@@ -1,0 +1,101 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 虚拟环境
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# 模型文件（大文件）
+models/*.pt
+models/*.onnx
+models/*.om
+models/*.pth
+models/*.pkl
+models/*.h5
+models/dolphin/
+*.pt
+*.onnx
+*.om
+
+# 日志文件
+logs/
+*.log
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+depression.db
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# 音频/视频文件
+*.wav
+*.mp3
+*.mp4
+*.avi
+*.mov
+
+# 配置文件（包含敏感信息）
+config.ini
+.env
+.env.local
+secrets.json
+
+# 系统文件
+Thumbs.db
+.DS_Store
+
+# 测试覆盖率
+.coverage
+htmlcov/
+.pytest_cache/
+
+# 文档构建
+docs/_build/
+
+# 其他
+*.pyc
+*.pyo
+*.pyd
+._____temp/
+

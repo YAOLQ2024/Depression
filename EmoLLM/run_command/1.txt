@@ -1,0 +1,3 @@
+curl.exe -s -X POST http://127.0.0.1:8001/report ^
+More?   -H "Content-Type: application/json" ^
+More?   -d "{\"user_id\":\"u004\",\"sds\":{\"raw_score\":83},\"context\":{\"sleep_hours\":3}}"

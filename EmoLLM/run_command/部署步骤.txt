@@ -1,0 +1,159 @@
+================================================================================
+  EmoLLM 项目 — 从零部署运行步骤（适用 Linux / WSL Ubuntu，环境重装后）
+================================================================================
+根据你 run_command 下的笔记整理，按顺序执行即可。
+
+--------------------------------------------------------------------------------
+一、系统与基础依赖（Ubuntu / WSL）
+--------------------------------------------------------------------------------
+# 1. 更新并安装基础工具（含 git、git-lfs，用于后续拉取模型）
+sudo apt update
+sudo apt install -y git git-lfs curl ca-certificates build-essential
+
+# 2. 启用 Git LFS（大模型文件必须）
+git lfs install
+
+# 3. 安装 Python 虚拟环境相关
+sudo apt install -y python3-venv python3-dev
+
+# 4. 若有 NVIDIA GPU，确认驱动与 CUDA（可选）
+nvidia-smi
+
+
+--------------------------------------------------------------------------------
+二、Python 虚拟环境（ conda）
+--------------------------------------------------------------------------------
+
+
+【方式：conda】
+# 若无 conda，先安装 Miniconda（Python 3.11）
+# wget https://repo.anaconda.com/miniconda/Miniconda3-py311_24.1.2-0-Linux-x86_64.sh
+# bash Miniconda3-py311_24.1.2-0-Linux-x86_64.sh
+# source ~/.bashrc
+conda create -n emo311 python=3.11 -y
+conda activate emo311
+
+# 确认 Python 版本
+python --version   # 建议 3.11.x
+
+
+--------------------------------------------------------------------------------
+三、进入项目并升级 pip
+--------------------------------------------------------------------------------
+cd /home/ZR/data2/Depression/EmoLLM
+# 若你项目在别的路径，改成你的路径，例如: cd ~/EmoLLM
+
+python -m pip install --upgrade pip
+
+
+--------------------------------------------------------------------------------
+四、安装 PyTorch（先装，再装其余依赖，避免版本被覆盖）
+--------------------------------------------------------------------------------
+【有 NVIDIA GPU（CUDA 12.1）】
+pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio
+
+【仅 CPU】
+pip install torch torchvision torchaudio
+
+
+--------------------------------------------------------------------------------
+五、安装项目主依赖（用成功环境冻结列表，避免 requirements.txt 冲突）
+--------------------------------------------------------------------------------
+# requirements.txt 中部分依赖会冲突，故用你成功部署后生成的 requirements.freeze.txt。
+# 已生成可安装版本 requirements.freeze.install.txt（去掉了原 freeze 里不可用的项）：
+#   - 去掉了「numpy @ file:///...」本地路径，改为 numpy==1.26.4
+#   - 去掉了 torch/torchvision/torchaudio（已在第四步用 cu121 安装）
+# 按顺序执行：
+
+pip install -r requirements.freeze.install.txt
+
+# 你笔记里还单独装过 modelscope（用于下载模型）、以及固定 transformers 版本，建议：
+pip install modelscope
+pip install transformers==4.37.2
+
+
+--------------------------------------------------------------------------------
+六、模型文件（三选一，按你当前情况选）
+--------------------------------------------------------------------------------
+你已有 model 目录且里面已有 EmoLLM_Qwen2-7B-Instruct_lora（含 config.json、pytorch_model-*.bin），
+则无需再下载，直接跳到「七、启动」即可。
+
+【选项 1】已有模型（从旧机器复制过来的）
+  保持 model_path 为当前脚本里的 ./model/EmoLLM_Qwen2-7B-Instruct_lora 即可。
+  脚本已改为：若该目录下已有 config.json 则不会再次 git clone，避免覆盖。
+
+【选项 2】用 ModelScope 下载（与笔记一致）
+  modelscope download --model aJupyter/EmoLLM_PT_InternLM1.8B-chat --local_dir ./model/EmoLLM_PT_InternLM1_8B-chat
+  modelscope download --model aJupyter/EmoLLM_Qwen1_5-0_5B-Chat_full_sft --local_dir ./model/EmoLLM_Qwen1_5-0_5B-Chat_full_sft
+  modelscope download --model aJupyter/EmoLLM_Qwen2-7B-Instruct_lora --local_dir ./model/EmoLLM_Qwen2-7B-Instruct_lora
+
+  若要用其中某一套，需改 web_internlm2_5.py 里 model_path 并注释掉/保留「仅当无 config.json 才 clone」那段逻辑（当前已保留，且已有目录会跳过 clone）。
+
+【选项 3】完全依赖脚本自动拉取（OpenXLab）
+  删除或移走 ./model/EmoLLM_Qwen2-7B-Instruct_lora 目录后，直接启动；脚本会自动 clone EmoLLM_V3.0 到该路径并 git lfs pull。
+
+
+--------------------------------------------------------------------------------
+七、启动 Web 界面（纯对话，无 RAG）
+--------------------------------------------------------------------------------
+# 确保在项目根目录且虚拟环境已激活
+streamlit run web_internlm2_5.py --server.address 0.0.0.0 --server.port 7860
+
+# 本机访问: http://127.0.0.1:7860
+# 局域网访问: http://<本机IP>:7860   （查看 IP: hostname -I）
+
+
+--------------------------------------------------------------------------------
+八、（可选）启用 RAG 知识库
+--------------------------------------------------------------------------------
+知识库路径由 rag/src/config/config.py 的 knowledge_base_roots 决定，预置了：
+  EmoLLMRAGTXT、my_depression_kb、merged_depression_kb、myDD_knowledge_txt，
+每个对应 rag/<名称>/vector_db/。不需要也不应把向量库放到 rag/src/data/vector_db/。
+
+# 1. 安装 RAG 子目录依赖
+cd rag
+pip install -r requirements.txt
+cd ..
+
+# 2. 若要用官方向量库：在 rag 目录下 clone，得到 rag/EmoLLMRAGTXT/vector_db/ 即可
+cd rag
+git clone https://code.openxlab.org.cn/Anooyman/EmoLLMRAGTXT.git
+# 或: git clone https://www.modelscope.cn/datasets/Anooyman/EmoLLMRAGTXT.git
+cd ..
+
+# 自建知识库（如 my_depression_kb、merged_depression_kb）按 快速开始-自定义知识库.md / 知识库构建教程.md
+# 构建或合并后，会落在 rag/my_depression_kb/vector_db/、rag/merged_depression_kb/vector_db/，
+# 界面里「知识库选择」下拉框会列出这些，直接选即可，无需改 config 或复制到 src/data。
+
+# 3. 可选：预下载 embedding / 重排模型（放项目根目录下 model 里）
+# pip install "huggingface_hub[cli]"
+# huggingface-cli download BAAI/bge-small-zh-v1.5 --local-dir model/embedding_model
+# huggingface-cli download BAAI/bge-reranker-large --local-dir model/rerank_model
+
+# 4. 启动 RAG 版（用另一脚本）
+streamlit run web_internlm2.py --server.address 0.0.0.0 --server.port 7860
+
+
+--------------------------------------------------------------------------------
+九、切换使用的模型（改 model_path）
+--------------------------------------------------------------------------------
+编辑 web_internlm2_5.py，修改 model_path 并注释/取消注释对应行即可，例如：
+  # model_path = './model/EmoLLM_PT_InternLM1_8B-chat'
+  # model_path = './model/EmoLLM_Qwen1_5-0_5B-Chat_full_sft'
+  model_path = './model/EmoLLM_Qwen2-7B-Instruct_lora'
+保存后重新运行 streamlit 命令。
+
+
+--------------------------------------------------------------------------------
+十、环境回滚（可选）
+--------------------------------------------------------------------------------
+若以后要还原依赖版本，可先保存当前环境：
+  pip freeze > before_rag.txt
+需要时用：
+  pip install -r before_rag.txt
+（注意：跨机器/跨 CUDA 版本时 PyTorch 建议重装对应版本。）
+
+================================================================================
+以上步骤按顺序执行即可在 Linux / WSL Ubuntu 上从零把 EmoLLM 部署并运行成功。
+你当前 model 下已有 EmoLLM_Qwen2-7B-Instruct_lora，完成「二～五」和「七」即可启动。
+================================================================================

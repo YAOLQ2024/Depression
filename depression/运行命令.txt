@@ -1,0 +1,9 @@
+conda activate depression
+
+cd /home/ZR/data2/Depression/yiyuzhen_project
+
+python3 start_app_gpu.py
+
+conda deactivate
+
+zip -r yiyuzhen_backup.zip yiyuzhen_project/ -x "*/.git/*" "*/logs/*" "*/models/*" "*/__pycache__/*"
