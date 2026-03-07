@@ -10,12 +10,21 @@ from utils import db
 import logging
 import datetime
 import json
+import time
+
+try:
+    from new_features.skill_router.base import SkillContext
+    from new_features.skill_router.router import get_skill_router
+except Exception:  # pragma: no cover - keep legacy flow safe if optional module fails
+    SkillContext = None
+    get_skill_router = None
 
 # 配置日志
 logger = logging.getLogger(__name__)
 
 # 创建蓝图
 pc = Blueprint("psychological_counseling", __name__)
+skill_router = get_skill_router() if get_skill_router else None
 
 
 @pc.route('/api/chat', methods=['POST'])
@@ -53,7 +62,7 @@ def chat():
         
         # 获取用户信息
         userinfo = session.get('userinfo', {})
-        username = userinfo.get('username', 'unknown')
+        username = userinfo.get('username') or userinfo.get('name') or 'unknown'
         
         # 打印用户消息到终端
         print(f"\n{'='*60}")
@@ -66,6 +75,53 @@ def chat():
         if include_emotion:
             emotion_context = _get_user_emotion_context(username)
         
+        skill_result = _try_route_chat_skill(
+            username=username,
+            user_message=user_message,
+            history=history,
+            include_emotion=include_emotion,
+            emotion_context=emotion_context,
+            stream=stream,
+            web_search=web_search,
+            request_payload=data,
+        )
+        if skill_result:
+            response_text = skill_result['response_text']
+            skill_name = skill_result['skill_name']
+            store_emotion_context = skill_result.get('emotion_context')
+
+            if skill_result.get('should_store', True):
+                _save_chat_record(username, user_message, response_text, store_emotion_context)
+
+            if stream:
+                from flask import Response
+                import json as json_lib
+
+                def generate_skill_response():
+                    for chunk in _iter_stream_chunks(response_text):
+                        yield f"data: {json_lib.dumps({'chunk': chunk, 'done': False}, ensure_ascii=False)}\n\n"
+                        time.sleep(0.02)
+                    yield f"data: {json_lib.dumps({'chunk': '', 'done': True, 'full_response': response_text}, ensure_ascii=False)}\n\n"
+                    print(f"\n{'='*60}")
+                    print(f"[Skill:{skill_name}] {username}: {response_text}")
+                    print(f"{'='*60}\n")
+                    logger.info("[Skill:%s] %s: %s...", skill_name, username, response_text[:100])
+
+                return Response(generate_skill_response(), mimetype='text/event-stream')
+
+            print(f"\n{'='*60}")
+            print(f"[Skill:{skill_name}] {username}: {response_text}")
+            print(f"{'='*60}\n")
+            logger.info("[Skill:%s] %s: %s...", skill_name, username, response_text[:100])
+
+            return jsonify({
+                'status': 'success',
+                'response': response_text,
+                'history': history,
+                'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'emotion_included': include_emotion
+            })
+
         # 调用EmoLLM
         logger.info(f"用户 {username} 发起咨询: {user_message[:50]}... (流式: {stream}, 联网搜索: {web_search})")
         
@@ -83,7 +139,7 @@ def chat():
                 full_response = ""
                 try:
                     # 调用流式API，传入 enable_web_search
-                    for chunk in emollm_client.chat_stream(
+                    for event in emollm_client.chat_stream(
                         prompt=user_message,
                         history=history,
                         emotion_context=emotion_context,
@@ -92,13 +148,23 @@ def chat():
                         enable_web_search=web_search,
                         timeout=timeout
                     ):
-                        if chunk:
-                            full_response += chunk
-                            # 发送SSE格式的数据
-                            yield f"data: {json_lib.dumps({'chunk': chunk, 'done': False})}\n\n"
+                        if not event:
+                            continue
+
+                        if isinstance(event, dict):
+                            if event.get('chunk'):
+                                full_response += event['chunk']
+                            if event.get('replace_full_response'):
+                                full_response = event['replace_full_response']
+                            yield f"data: {json_lib.dumps(event, ensure_ascii=False)}\n\n"
+                            continue
+
+                        full_response += event
+                        # 发送SSE格式的数据
+                        yield f"data: {json_lib.dumps({'chunk': event, 'done': False}, ensure_ascii=False)}\n\n"
                     
                     # 流式输出完成
-                    yield f"data: {json_lib.dumps({'chunk': '', 'done': True, 'full_response': full_response})}\n\n"
+                    yield f"data: {json_lib.dumps({'chunk': '', 'done': True, 'full_response': full_response}, ensure_ascii=False)}\n\n"
                     
                     # 打印AI回复到终端
                     print(f"\n{'='*60}")
@@ -115,7 +181,7 @@ def chat():
                     print(f"[AI调用失败] {username}: {error_msg}")
                     print(f"{'='*60}\n")
                     logger.error(f"[AI调用失败] {username}: {error_msg}", exc_info=True)
-                    yield f"data: {json_lib.dumps({'error': error_msg, 'done': True})}\n\n"
+                    yield f"data: {json_lib.dumps({'error': error_msg, 'done': True}, ensure_ascii=False)}\n\n"
             
             return Response(generate(), mimetype='text/event-stream')
         else:
@@ -351,7 +417,7 @@ def get_counseling_history():
     """
     try:
         userinfo = session.get('userinfo', {})
-        username = userinfo.get('username')
+        username = userinfo.get('username') or userinfo.get('name')
         
         if not username:
             return jsonify({
@@ -376,6 +442,55 @@ def get_counseling_history():
 
 
 # ============= 辅助函数 =============
+
+
+def _try_route_chat_skill(
+    *,
+    username,
+    user_message,
+    history,
+    include_emotion,
+    emotion_context,
+    stream,
+    web_search,
+    request_payload,
+):
+    """Try to handle the current chat request with a registered skill."""
+    if not skill_router or not SkillContext:
+        return None
+
+    context = SkillContext(
+        username=username,
+        message=user_message,
+        history=history,
+        include_emotion=include_emotion,
+        emotion_context=emotion_context,
+        stream=stream,
+        web_search=web_search,
+        request_payload=request_payload,
+    )
+
+    result = skill_router.route(context)
+    if not result:
+        return None
+
+    return {
+        'skill_name': result.skill_name,
+        'response_text': result.response_text,
+        'should_store': result.should_store,
+        'emotion_context': result.emotion_context,
+        'metadata': result.metadata,
+    }
+
+
+def _iter_stream_chunks(text, chunk_size=24):
+    """Split locally generated text into small chunks so the frontend can render progressively."""
+    content = str(text or "")
+    if not content:
+        return
+    for idx in range(0, len(content), chunk_size):
+        yield content[idx:idx + chunk_size]
+
 
 def _get_user_emotion_context(username):
     """

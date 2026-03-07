@@ -72,4 +72,14 @@ def create_app():
     from .views import psychological_counseling
     app.register_blueprint(psychological_counseling.pc)
 
+    # 注册新增会话总结Skill接口（独立目录实现，默认不影响原有问诊链路）
+    try:
+        from new_features.session_summary_skill.api import session_summary_bp
+
+        app.register_blueprint(session_summary_bp)
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "session_summary_skill blueprint not loaded: %s", exc
+        )
+
     return app

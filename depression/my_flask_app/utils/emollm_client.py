@@ -5,13 +5,20 @@ EmoLLM API客户端
 用于调用心理咨询服务（支持硅基流动API）
 """
 
-import re
 import requests
 import logging
 import os
 import json
+import re
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import time
+
+from new_features.chat_intent_router.policy import (
+    INTENT_PSYCHOLOGY,
+    ChatIntentDecision,
+    classify_chat_intent,
+)
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -84,6 +91,328 @@ class EmoLLMClient:
             })
         
         return session
+
+    def _classify_intent(self, prompt: str, enable_web_search: bool) -> ChatIntentDecision:
+        """Classify the current user message before building prompts."""
+        decision = classify_chat_intent(
+            prompt,
+            enable_web_search=enable_web_search,
+            search_available=bool(self.tavily_api_key),
+        )
+        logger.info(
+            "[Route] intent=%s rag=%s web_search=%s direct=%s reason=%s",
+            decision.intent,
+            decision.use_rag,
+            decision.use_web_search,
+            bool(decision.direct_response),
+            decision.reason,
+        )
+        return decision
+
+    def _is_datetime_query(self, prompt: str) -> bool:
+        text = str(prompt or "")
+        keywords = ("今天几号", "今天星期几", "星期几", "周几", "几月几号", "日期", "几号", "现在几点", "几点", "当前时间")
+        return any(keyword in text for keyword in keywords)
+
+    def _is_weather_query(self, prompt: str) -> bool:
+        text = str(prompt or "")
+        return "天气" in text or "气温" in text or "温度" in text
+
+    def _normalize_web_search_query(self, prompt: str) -> str:
+        text = str(prompt or "").strip()
+        text = re.sub(r"\s+", "", text)
+
+        cleanup_phrases = [
+            "你说错了",
+            "重新搜索",
+            "重新查",
+            "重新查询",
+            "再搜索一遍",
+            "再查一遍",
+            "确认一下",
+            "确认",
+            "请问",
+            "请你",
+            "帮我",
+            "麻烦你",
+            "告诉我",
+            "查一下",
+            "查询一下",
+            "搜索一下",
+        ]
+        for phrase in cleanup_phrases:
+            text = text.replace(phrase, "")
+        text = text.strip("：:，,。！？? ")
+
+        if self._is_datetime_query(prompt):
+            return "北京时间 当前日期 星期几 现在时间"
+
+        if self._is_weather_query(prompt):
+            location_match = re.search(r"(.{1,12}?)(?:今天|今日|现在)?(?:的)?天气", text)
+            location = location_match.group(1).strip("的") if location_match else ""
+            if location and location not in ("今天", "今日", "现在"):
+                return f"{location} 今天天气 实时 气温 风力"
+            return f"{text or '当前地区'} 实时天气"
+
+        return text or str(prompt or "").strip()
+
+    def _build_realtime_context(self, prompt: str) -> str:
+        if not self._is_datetime_query(prompt):
+            return ""
+
+        now = datetime.now()
+        weekday_map = "一二三四五六日"
+        weekday_text = f"星期{weekday_map[now.weekday()]}"
+        return (
+            "【系统时间（Asia/Shanghai）】\n"
+            f"当前日期: {now:%Y-%m-%d}\n"
+            f"当前星期: {weekday_text}\n"
+            f"当前时间: {now:%H:%M:%S}"
+        )
+
+    def _build_datetime_answer(self, prompt: str) -> str:
+        now = datetime.now()
+        weekday_map = "一二三四五六日"
+        weekday_text = f"星期{weekday_map[now.weekday()]}"
+
+        if "几点" in prompt or "时间" in prompt:
+            return f"根据当前系统时间（Asia/Shanghai），现在是 {now:%Y-%m-%d %H:%M:%S}，{weekday_text}。"
+
+        return f"根据当前系统时间（Asia/Shanghai），今天是 {now:%Y年%m月%d日}，{weekday_text}。"
+
+    def _perform_web_search(self, prompt: str, max_results: int = 3) -> str:
+        search_query = self._normalize_web_search_query(prompt)
+        logger.info("[WebSearch] normalized query=%s original=%s", search_query, str(prompt or "")[:80])
+        return self._tavily_search(search_query, max_results=max_results)
+
+    def _extract_focus_term(self, prompt: str) -> str:
+        text = str(prompt or "").strip()
+        if not text:
+            return ""
+
+        parts = re.split(r"(?:是什么|是啥|什么意思|代表什么)", text, maxsplit=1)
+        if not parts:
+            return ""
+
+        candidate = parts[0].strip("：:，,。！？? ")
+        for prefix in (
+            "请问",
+            "请你",
+            "帮我解释一下",
+            "帮我解释",
+            "帮我介绍一下",
+            "帮我介绍",
+            "帮我说一下",
+            "告诉我",
+            "帮我",
+            "请解释一下",
+            "请解释",
+            "解释一下",
+            "解释",
+        ):
+            if candidate.startswith(prefix):
+                candidate = candidate[len(prefix):].strip("：:，,。！？? ")
+
+        if not candidate or len(candidate) > 24 or "\n" in candidate:
+            return ""
+        return candidate
+
+    def _maybe_bold_focus_term(self, prompt: str, response: str) -> str:
+        focus_term = self._extract_focus_term(prompt)
+        if not focus_term:
+            return response
+        if f"**{focus_term}**" in response:
+            return response
+        return re.sub(re.escape(focus_term), lambda _: f"**{focus_term}**", response, count=1)
+
+    def _postprocess_response(self, prompt: str, decision: ChatIntentDecision, response: str) -> str:
+        if not response:
+            return response
+        if decision.intent == INTENT_PSYCHOLOGY:
+            return self._maybe_bold_focus_term(prompt, response)
+        return response
+
+    def _iter_local_response_chunks(self, response: str, chunk_size: int = 24):
+        text = str(response or "")
+        if not text:
+            return
+        for idx in range(0, len(text), chunk_size):
+            yield text[idx:idx + chunk_size]
+
+    def _build_system_prompt_for_intent(
+        self,
+        decision: ChatIntentDecision,
+        emotion_context: Optional[Dict] = None,
+    ) -> str:
+        """Build a route-specific system prompt."""
+        if decision.intent == INTENT_PSYCHOLOGY:
+            system_prompt = (
+                "你是一个心理健康咨询助手。面对心理、情绪、量表相关问题时，"
+                "请先直接回应用户当前最核心的诉求，再给出必要的专业解释和温和建议。"
+                "不要把普通问题回答成心理学名词百科，也不要输出与当前问题无关的术语清单。"
+                "如果用户明确询问某个量表、术语或缩写，首次提到核心名词时请用 Markdown 加粗。"
+                "请用中文回复，语气自然、友好、共情。"
+            )
+        elif decision.intent == "realtime":
+            system_prompt = (
+                "你是一个信息整理助手。你只能依据我提供的【最新联网搜索结果】回答。"
+                "如果搜索结果不足以支撑结论，请明确说信息不足。"
+                "如果额外提供了【系统时间（Asia/Shanghai）】，且用户询问日期、星期或当前时间，请优先依据该信息回答。"
+                "不要依赖过时记忆，不要补充心理建议。请用中文简洁作答。"
+            )
+        else:
+            system_prompt = (
+                "你是一个中文助手。请针对用户问题直接、简洁、具体地回答。"
+                "除非用户明确询问心理学或量表，否则不要扩展成心理学名词解释、量表说明或泛泛的心理建议。"
+                "请用中文自然作答。"
+            )
+
+        if emotion_context and decision.intent == INTENT_PSYCHOLOGY:
+            emotion_info = []
+            if 'facial_emotion' in emotion_context:
+                emotion_info.append(f"面部表情: {emotion_context['facial_emotion']}")
+            if 'depression_score' in emotion_context:
+                emotion_info.append(f"抑郁评分: {emotion_context['depression_score']}")
+            if emotion_info:
+                system_prompt += f"\n\n注意：用户当前状态 - {', '.join(emotion_info)}"
+
+        return system_prompt
+
+    def _build_user_prompt_for_intent(
+        self,
+        prompt: str,
+        decision: ChatIntentDecision,
+        rag_text: str = "",
+        search_result: str = "",
+        realtime_context: str = "",
+    ) -> str:
+        """Build the final user prompt according to the selected route."""
+        base = str(prompt or "").strip()
+
+        if decision.intent == INTENT_PSYCHOLOGY:
+            if rag_text:
+                return (
+                    f"【专业知识库】\n{rag_text}\n\n"
+                    f"【用户提问】\n{base}\n\n"
+                    "请先直接回答用户当前最核心的问题，再在必要时补充专业解释。"
+                    "如果用户在问明确的量表、术语或缩写，回答开头首次出现该名词时请用 Markdown 加粗。"
+                    "仅围绕当前问题展开，不要输出无关的心理学术语清单。"
+                    "除非用户明确要求列表或量表条目，否则不要堆砌长列表。"
+                )
+            return (
+                f"【用户提问】\n{base}\n\n"
+                "请先共情，再直接回应当前问题。不要输出无关的心理学名词解释。"
+                "如果用户在问明确的量表、术语或缩写，回答开头首次出现该名词时请用 Markdown 加粗。"
+            )
+
+        if decision.intent == "realtime":
+            context_parts = []
+            if realtime_context:
+                context_parts.append(realtime_context)
+            context_parts.append(f"【最新联网搜索结果】\n{search_result}")
+            context_parts.append(f"【用户问题】\n{base}")
+            return (
+                "\n\n".join(context_parts)
+                + "\n\n"
+                "请严格基于上面的最新搜索结果作答；如果搜索结果不足以支持结论，请明确说明信息不足。"
+            )
+
+        return (
+            f"【用户问题】\n{base}\n\n"
+            "请直接、简洁、准确回答。除非用户明确询问心理学，否则不要扩展为心理学名词解释、量表说明或泛泛的心理建议。"
+        )
+
+    def _prepare_chat_request(
+        self,
+        *,
+        prompt: str,
+        history: Optional[List[Tuple[str, str]]],
+        emotion_context: Optional[Dict],
+        enable_web_search: bool,
+        decision: Optional[ChatIntentDecision] = None,
+        search_result_override: Optional[str] = None,
+    ) -> Dict:
+        """Prepare routed prompts, RAG, and optional search results for a chat request."""
+        history = history or []
+        decision = decision or self._classify_intent(prompt, enable_web_search)
+
+        if decision.direct_response:
+            return {
+                "decision": decision,
+                "history": history,
+                "direct_response": decision.direct_response,
+                "messages": [],
+                "retrieval_content": [],
+                "search_result": "",
+                "final_prompt": prompt,
+            }
+
+        search_result = ""
+        if decision.use_web_search:
+            search_result = (
+                search_result_override
+                if search_result_override is not None
+                else self._perform_web_search(prompt, max_results=3)
+            )
+            if not search_result:
+                direct_response = None
+                if decision.intent == "realtime" and self._is_datetime_query(prompt):
+                    direct_response = self._build_datetime_answer(prompt)
+                return {
+                    "decision": decision,
+                    "history": history,
+                    "direct_response": direct_response or "联网搜索未返回有效结果，暂时无法准确回答这个最新信息问题。",
+                    "messages": [],
+                    "retrieval_content": [],
+                    "search_result": "",
+                    "final_prompt": prompt,
+                }
+
+        if decision.intent == "realtime" and self._is_datetime_query(prompt):
+            return {
+                "decision": decision,
+                "history": history,
+                "direct_response": self._build_datetime_answer(prompt),
+                "messages": [],
+                "retrieval_content": [],
+                "search_result": search_result,
+                "final_prompt": prompt,
+            }
+
+        routed_prompt = (
+            self._enhance_prompt_with_emotion(prompt, emotion_context)
+            if decision.intent == INTENT_PSYCHOLOGY
+            else prompt
+        )
+        retrieval_content = self._rag_retrieve(prompt) if decision.use_rag else []
+        rag_text = self._format_retrieval_content(retrieval_content) if retrieval_content else ""
+        realtime_context = self._build_realtime_context(prompt)
+
+        system_prompt = self._build_system_prompt_for_intent(decision, emotion_context)
+        final_prompt = self._build_user_prompt_for_intent(
+            routed_prompt,
+            decision,
+            rag_text=rag_text,
+            search_result=search_result,
+            realtime_context=realtime_context,
+        )
+
+        messages = [{"role": "system", "content": system_prompt}]
+        history_to_use = [] if decision.intent == "realtime" else history
+        for user_msg, ai_msg in history_to_use:
+            messages.append({"role": "user", "content": user_msg})
+            messages.append({"role": "assistant", "content": ai_msg})
+        messages.append({"role": "user", "content": final_prompt})
+
+        return {
+            "decision": decision,
+            "history": history_to_use,
+            "direct_response": None,
+            "messages": messages,
+            "retrieval_content": retrieval_content,
+            "search_result": search_result,
+            "final_prompt": final_prompt,
+        }
     
     def chat(self, 
              prompt: str,
@@ -110,54 +439,23 @@ class EmoLLMClient:
         Returns:
             (response, updated_history): AI回复和更新后的历史记录
         """
-        if history is None:
-            history = []
-        
-        # 如果有情绪上下文，增强prompt
-        enhanced_prompt = self._enhance_prompt_with_emotion(prompt, emotion_context)
+        prepared = self._prepare_chat_request(
+            prompt=prompt,
+            history=history,
+            emotion_context=emotion_context,
+            enable_web_search=enable_web_search,
+        )
+        history = prepared["history"]
+        decision = prepared["decision"]
+        retrieval_content = prepared["retrieval_content"]
 
-        # ====== 净化 + 结构模板 ======
-        retrieval_content = self._rag_retrieve(prompt)
-        rag_text = self._format_retrieval_content(retrieval_content)
-        enhanced_prompt = self._build_detailed_user_prompt(enhanced_prompt, rag_text)
+        if prepared["direct_response"]:
+            ai_response = self._postprocess_response(prompt, decision, prepared["direct_response"])
+            updated_history = history + [(prompt, ai_response)]
+            logger.info("[Route] direct response intent=%s", decision.intent)
+            return ai_response, updated_history
 
-        # 加这一行！打印出来看看净化后的内容
-        logger.info(f"\n[调试] 喂给大模型的干净RAG资料:\n{rag_text}\n")
-        
-        # 构建系统提示词
-        system_prompt = """你是一个由aJupyter、Farewell、jujimeizuo、Smiling&Weeping研发（排名按字母顺序排序，不分先后）、散步提供技术支持、上海人工智能实验室提供支持开发的心理健康大模型。现在你是一个心理专家，我有一些心理问题，请你用专业的知识帮我解决。
-
-当用户询问心理相关问题时：
-- 以温暖、共情的方式回应
-- 提供专业的心理建议和支持
-- 在必要时建议寻求专业帮助
-
-当用户询问一般性问题时（如日期、天气、新闻、最新事件、实时数据等）：
-- 如果问题需要实时信息或最新数据，请使用tavily_search函数进行联网搜索
-- 直接、准确地回答问题
-
-请用中文回复，语气自然、友好且富有同理心。"""
-        
-        # 如果有情绪上下文，添加到系统提示词中
-        if emotion_context:
-            emotion_info = []
-            if 'facial_emotion' in emotion_context:
-                emotion_info.append(f"面部表情: {emotion_context['facial_emotion']}")
-            if 'depression_score' in emotion_context:
-                emotion_info.append(f"抑郁评分: {emotion_context['depression_score']}")
-            if emotion_info:
-                system_prompt += f"\n\n注意：用户当前状态 - {', '.join(emotion_info)}"
-        
-        # 将history转换为messages格式（硅基流动使用OpenAI格式）
-        messages = [{"role": "system", "content": system_prompt}]
-        
-        # 添加历史对话
-        for user_msg, ai_msg in history:
-            messages.append({"role": "user", "content": user_msg})
-            messages.append({"role": "assistant", "content": ai_msg})
-        
-        # 添加当前用户消息
-        messages.append({"role": "user", "content": enhanced_prompt})
+        messages = prepared["messages"]
         
         # 构建硅基流动API请求数据
         # 增加max_tokens以获得更长的回复（默认2048太小，改为至少4096）
@@ -165,11 +463,6 @@ class EmoLLMClient:
         # 默认更长一点，但不强行 4096（对吞吐更友好）
         default_max = int(os.getenv("LLM_MAX_TOKENS_DEFAULT", "1200"))
         effective_max_tokens = max(256, min(int(max_length or default_max), 4096))
-        
-        # 获取函数定义（仅当 API Key 存在 且 用户开启了搜索时）
-        tools = None
-        if self.tavily_api_key and enable_web_search:
-            tools = self._get_function_definitions()
         
         request_data = {
             "model": self.model,
@@ -187,13 +480,8 @@ class EmoLLMClient:
             len(prompt),
             len(history),
             len(retrieval_content),
-            bool(enable_web_search),
+            decision.use_web_search,
         )
-        
-        # 如果启用了Function Calling，添加到请求中
-        if tools:
-            request_data["tools"] = tools
-            request_data["tool_choice"] = "auto"  # 让模型自动决定是否调用函数
         
         # 使用传入的timeout或默认timeout
         request_timeout = timeout if timeout is not None else self.timeout
@@ -223,101 +511,18 @@ class EmoLLMClient:
                 if 'choices' in result and len(result['choices']) > 0:
                     choice = result['choices'][0]
                     message = choice.get('message', {})
-                    
-                    # 检查是否有function call
-                    if message.get('tool_calls'):
-                        # 处理function call
-                        tool_calls = message.get('tool_calls', [])
-                        function_results = []
-                        
-                        for tool_call in tool_calls:
-                            function_name = tool_call.get('function', {}).get('name', '')
-                            function_args = tool_call.get('function', {}).get('arguments', '')
-                            
-                            if function_name == 'tavily_search':
-                                try:
-                                    args = json.loads(function_args) if isinstance(function_args, str) else function_args
-                                    search_query = args.get('query', '')
-                                    max_results = args.get('max_results', 5)
-                                    
-                                    logger.info(f"执行Function Call: tavily_search(query={search_query}, max_results={max_results})")
-                                    
-                                    # 调用Tavily搜索
-                                    search_result = self._tavily_search(search_query, max_results)
-                                    
-                                    # 添加function call结果到messages
-                                    function_results.append({
-                                        "role": "tool",
-                                        "tool_call_id": tool_call.get('id', ''),
-                                        "content": search_result if search_result else "未找到相关信息"
-                                    })
-                                    
-                                except Exception as e:
-                                    logger.error(f"执行Function Call失败: {e}", exc_info=True)
-                                    function_results.append({
-                                        "role": "tool",
-                                        "tool_call_id": tool_call.get('id', ''),
-                                        "content": f"搜索失败: {str(e)}"
-                                    })
-                        
-                        # 如果有function call结果，需要再次调用API获取最终回复
-                        if function_results:
-                            # 添加assistant的function call消息
-                            messages.append({
-                                "role": "assistant",
-                                "content": None,
-                                "tool_calls": tool_calls
-                            })
-                            
-                            # 添加function call结果
-                            messages.extend(function_results)
-                            
-                            # 再次调用API获取最终回复
-                            request_data_final = {
-                                "model": self.model,
-                                "messages": messages,
-                                "temperature": temperature,
-                                "top_p": top_p,
-                                "max_tokens": effective_max_tokens,
-                                "stream": False
-                            }
-                            
-                            if tools:
-                                request_data_final["tools"] = tools
-                                request_data_final["tool_choice"] = "auto"
-                            
-                            response_final = self.session.post(
-                                self.api_url,
-                                json=request_data_final,
-                                timeout=request_timeout
-                            )
-                            logger.info(
-                                "[LLM] tool-followup response status=%s stream=%s url=%s",
-                                response_final.status_code,
-                                False,
-                                self.api_url,
-                            )
-                            response_final.raise_for_status()
-                            result_final = response_final.json()
-                            
-                            if 'choices' in result_final and len(result_final['choices']) > 0:
-                                ai_response = result_final['choices'][0].get('message', {}).get('content', '')
-                            else:
-                                ai_response = "抱歉，处理搜索结果时出现错误。"
-                        else:
-                            ai_response = message.get('content', '')
-                    else:
-                        # 没有function call，直接获取回复
-                        ai_response = message.get('content', '')
+                    ai_response = message.get('content', '')
                 else:
                     ai_response = ""
                 
                 if not ai_response:
                     logger.warning("API返回空响应")
                     ai_response = "抱歉，我暂时无法理解您的意思，请重新表述一下。"
+
+                ai_response = self._postprocess_response(prompt, decision, ai_response)
                 
                 # 更新历史记录
-                updated_history = history + [(enhanced_prompt, ai_response)]
+                updated_history = history + [(prompt, ai_response)]
                 
                 logger.info(f"心理咨询响应成功 (耗时: {elapsed_time:.2f}s)")
                 
@@ -364,73 +569,61 @@ class EmoLLMClient:
                     emotion_context: Optional[Dict] = None,
                     enable_web_search: bool = False,
                     timeout: Optional[int] = None):
-        """流式心理咨询对话（强制搜索版：完美绕过本地模型的工具调用缺陷）"""
-        
-        # 1. 智能前置联网搜索（关键词拦截法，防止网络信息污染心理学专业知识！）
-        search_result = ""
-        if self.tavily_api_key and enable_web_search:
-            # 定义触发搜索的“时效性/客观性”关键词
-            search_keywords = [ '几号', '星期', '日期', '天气', '新闻', '最新', '实时', '时间','查询']
-            # 如果提问里包含这些词，才去搜；否则坚决不搜
-            needs_search = any(kw in prompt for kw in search_keywords)
-            
-            if needs_search:
-                logger.info(f"🔵 检测到时效性提问，触发联网搜索: {prompt}")
-                yield "🔍 **正在请求 Tavily 联网搜索最新信息...**\n\n"
-                try:
-                    search_result = self._tavily_search(prompt, max_results=3)
-                    if search_result:
-                        yield "✅ **搜索完成，正在结合最新信息组织语言...**\n\n"
-                except Exception as e:
-                    logger.error(f"强制搜索出错: {e}")
-                    yield f"⚠️ 搜索失败: {e}\n\n"
-            else:
-                logger.info(f"🟢 专业询问或情感倾诉，跳过网络搜索，保护本地资料纯净度")
+        """流式心理咨询对话（带意图分流与按需 RAG/联网搜索）"""
 
-        # 2. 准备提示词和上下文
-        if history is None:
-            history = []
-        enhanced_prompt = self._enhance_prompt_with_emotion(prompt, emotion_context)
+        decision = self._classify_intent(prompt, enable_web_search)
+        history = history or []
+        search_result = None
 
-        # ====== 净化 RAG ======
-        retrieval_content = self._rag_retrieve(prompt)
-        rag_text = self._format_retrieval_content(retrieval_content)
-        
-        # 【核心魔法】：把搜索结果和 RAG 知识库无缝融合！
-        if search_result:
-            if rag_text:
-                rag_text = f"【最新联网搜索结果】\n{search_result}\n\n【本地专业知识】\n{rag_text}"
-            else:
-                rag_text = f"【最新联网搜索结果】\n{search_result}"
+        if decision.direct_response:
+            logger.info("[Route] direct stream response intent=%s", decision.intent)
+            direct_response = self._postprocess_response(prompt, decision, decision.direct_response)
+            for piece in self._iter_local_response_chunks(direct_response):
+                yield piece
+            return
 
-        enhanced_prompt = self._build_detailed_user_prompt(enhanced_prompt, rag_text)
-                
-        # 强制系统提示词（精简版，因为不需要教它怎么调工具了）
-        system_prompt = """你是一个由aJupyter、Farewell、jujimeizuo、Smiling&Weeping等研发的心理健康大模型。现在你是一个心理专家。
-当用户询问心理相关问题时：
-- 以温暖、共情的方式回应并提供专业支持
+        if decision.use_web_search:
+            yield {"status": "🔍 **正在请求 Tavily 联网搜索最新信息...**"}
+            search_result = self._perform_web_search(prompt, max_results=3)
+            if not search_result:
+                yield {"status": "⚠️ **联网搜索未返回有效结果。**"}
+                time.sleep(0.15)
+                yield {"status_clear": True}
+                fallback_response = (
+                    self._build_datetime_answer(prompt)
+                    if self._is_datetime_query(prompt)
+                    else "联网搜索未返回有效结果，暂时无法准确回答这个最新信息问题。"
+                )
+                for piece in self._iter_local_response_chunks(fallback_response):
+                    yield piece
+                return
 
-当用户询问一般性问题时（如日期、天气、新闻、最新事件等）：
-- 直接根据我提供给你的【最新联网搜索结果】进行极其准确的客观回答，不要过度发散。
+            yield {"status": "✅ **搜索完成，正在结合最新信息组织语言...**"}
+            time.sleep(0.2)
+            yield {"status_clear": True}
 
-请用中文回复，语气自然、友好且富有同理心。"""
-        
-        if emotion_context:
-            emotion_info = []
-            if 'facial_emotion' in emotion_context:
-                emotion_info.append(f"面部表情: {emotion_context['facial_emotion']}")
-            if 'depression_score' in emotion_context:
-                emotion_info.append(f"抑郁评分: {emotion_context['depression_score']}")
-            if emotion_info:
-                system_prompt += f"\n\n注意：用户当前状态 - {', '.join(emotion_info)}"
-        
-        messages = [{"role": "system", "content": system_prompt}]
-        for user_msg, ai_msg in history:
-            messages.append({"role": "user", "content": user_msg})
-            messages.append({"role": "assistant", "content": ai_msg})
-        messages.append({"role": "user", "content": enhanced_prompt})
-        
-        # 3. 发起请求（去掉了所有 tools 相关的参数，把它当普通聊天发出去）
+        prepared = self._prepare_chat_request(
+            prompt=prompt,
+            history=history,
+            emotion_context=emotion_context,
+            enable_web_search=enable_web_search,
+            decision=decision,
+            search_result_override=search_result,
+        )
+        history = prepared["history"]
+        decision = prepared["decision"]
+        retrieval_content = prepared["retrieval_content"]
+
+        if prepared["direct_response"]:
+            logger.info("[Route] direct stream response intent=%s", decision.intent)
+            direct_response = self._postprocess_response(prompt, decision, prepared["direct_response"])
+            for piece in self._iter_local_response_chunks(direct_response):
+                yield piece
+            return
+
+        messages = prepared["messages"]
+
+        # 3. 发起请求
         default_max = int(os.getenv("LLM_MAX_TOKENS_DEFAULT", "1200"))
         effective_max_tokens = max(256, min(int(max_length or default_max), 4096))
         request_data = {
@@ -449,7 +642,7 @@ class EmoLLMClient:
             len(prompt),
             len(history),
             len(retrieval_content),
-            bool(enable_web_search),
+            decision.use_web_search,
         )
 
         request_timeout = timeout if timeout is not None else max(self.timeout, 120)
@@ -471,15 +664,19 @@ class EmoLLMClient:
 
             has_yielded_real_content = False
             generated_chars = 0
+            full_response = ""
 
             # 4. 极简解析流数据（代码大幅缩减，因为不需要解析 tool_calls 了）
             for line in response.iter_lines():
                 if not line: continue
                 line_str = line.decode('utf-8')
                 if not line_str.startswith('data: '): continue
+                payload = line_str[6:].strip()
+                if payload == '[DONE]':
+                    break
                 
                 try:
-                    data = json.loads(line_str[6:])
+                    data = json.loads(payload)
                     if not data.get('choices'): continue
                     
                     delta = data['choices'][0].get('delta', {})
@@ -491,12 +688,16 @@ class EmoLLMClient:
                             continue
                         has_yielded_real_content = True
                         generated_chars += len(content)
+                        full_response += content
                         yield content
                         
                 except Exception as e:
                     logger.warning(f"解析流式数据失败: {e}")
                     continue
 
+            postprocessed_response = self._postprocess_response(prompt, decision, full_response)
+            if postprocessed_response != full_response:
+                yield {"replace_full_response": postprocessed_response}
             logger.info("[LLM] stream completed chars=%d", generated_chars)
 
         except requests.exceptions.Timeout as e:
@@ -506,33 +707,6 @@ class EmoLLMClient:
             logger.error(f"流式请求异常: {e}", exc_info=True)
             yield f"\n\n抱歉，服务异常: {str(e)}"
     
-    def _build_detailed_user_prompt(self, user_prompt: str, rag_text: str) -> str:
-        """
-        自然深度版：彻底抛弃死板模板，优先直击问题核心，根据内容逻辑自然展开。
-        """
-        base = user_prompt.strip()
-
-        if rag_text:
-            prompt = (
-                f"【专业知识库】\n{rag_text}\n\n"
-                f"【用户提问】\n{base}\n\n"
-                f"你是一位经验丰富的资深心理专家。请结合知识库，以专业且自然流畅的风格进行解答：\n"
-                f"1. **分类响应**：\n"
-                f"   - **日常琐事**（如日期、天气）：请**极其简练**地一句话回答，不废话，不提心理建议。\n"
-                f"   - **专业问询**（如量表内容、名词解释、心理问题）：请开启“专家深度解答”模式。**严禁使用固定的模板套话**（如“核心定义”、“实际应用场景”等死板标题）。\n"
-                f"2. **直接回答**：首先必须正面、直接地回答用户最核心的诉求（例如：问清单就先列清单，问定义就先给定义）。\n"
-                f"3. **逻辑展开**：在直接回答后，根据内容本身的逻辑，自然地延伸相关背景、原理或注意事项。字数要充实，展现专业深度。\n"
-                f"4. **灵活排版**：充分使用 ### 标题 和 **加粗** 来增强可读性，但标题名称应根据内容灵活撰写，不要千篇一律。\n"
-                f"5. **人文关怀**：仅在结尾针对心理问题提供一段温暖、自然的建议，不要写得像操作手册。"
-            )
-        else:
-            prompt = (
-                f"你是一名专业温暖的心理专家。用户提问：{base}\n\n"
-                f"要求：琐事请直接简练回答；心理或情感问题请根据你的专业沉淀，深入浅出地进行逻辑严密的论述，展示专业深度与关怀。"
-            )
-            
-        return prompt
-
     def _format_retrieval_content(self, retrieval_content: List[str]) -> str:
         """
         极简安全版：绝不删除任何一行资料，防止上下文断裂。
