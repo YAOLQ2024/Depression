@@ -1,0 +1,94 @@
+# =========================
+# Root-level project policy
+# =========================
+
+# Keep only active code projects in this monorepo
+/dolphin_test/
+/UI参考/
+/yiyuzhen_project/
+/111.zip
+
+# =========================
+# Python / common build
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# =========================
+# Editor / OS
+# =========================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# =========================
+# Runtime logs / temp
+# =========================
+logs/
+**/logs/
+*.log
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# =========================
+# Secrets / privacy
+# =========================
+.env
+.env.*
+!.env.example
+!**/.env.example
+secrets.json
+config.ini
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# Local media / user data
+# =========================
+*.wav
+*.mp3
+*.mp4
+*.avi
+*.mov
+
+# =========================
+# Large model artifacts
+# =========================
+/EmoLLM/model/
+/EmoLLM/hf_merge/
+/EmoLLM/work_dirs/
+/EmoLLM/data/
+/EmoLLM/pdf/
+/EmoLLM/tmp/
+/EmoLLM/localFile/
+/EmoLLM/rag/data/
+/EmoLLM/rag/data/
+/EmoLLM/rag/model/
+/EmoLLM/rag/EmoLLMRAGTXT/
+/EmoLLM/rag/merged_depression_kb/
+/EmoLLM/rag/my_depression_kb/
+/EmoLLM/rag/myDD_knowledge_txt/
+/depression/models/*.onnx
+/depression/models/*.pt
+/depression/models/*.pth
+/depression/models/*.pkl
+/depression/models/*.om
+/depression/models/dolphin/
