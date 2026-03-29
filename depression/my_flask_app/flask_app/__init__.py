@@ -82,4 +82,13 @@ def create_app():
             "session_summary_skill blueprint not loaded: %s", exc
         )
 
+    try:
+        from new_features.scale_assessment.api import scale_assessment_bp
+
+        app.register_blueprint(scale_assessment_bp)
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "scale_assessment blueprint not loaded: %s", exc
+        )
+
     return app

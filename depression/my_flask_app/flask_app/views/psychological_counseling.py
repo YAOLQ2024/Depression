@@ -9,8 +9,12 @@ from utils.emollm_client import get_emollm_client
 from utils import db
 import logging
 import datetime
-import json
 import time
+from new_features.assessment_context.service import (
+    build_assessment_context,
+    get_assessment_payload,
+    get_latest_assessment_payload,
+)
 
 try:
     from new_features.skill_router.base import SkillContext
@@ -59,10 +63,23 @@ def chat():
         history = data.get('history', [])
         stream = data.get('stream', True)  # 默认启用流式输出
         web_search = data.get('web_search', False)  # 获取前端的搜索开关状态
-        
+        assessment_context = data.get('assessment_context')
+        include_report = data.get('include_report', False)
+        report_record_id = _parse_optional_int(data.get('report_record_id'))
+
         # 获取用户信息
         userinfo = session.get('userinfo', {})
+        user_id = userinfo.get('id')
+        user_role = userinfo.get('role')
         username = userinfo.get('username') or userinfo.get('name') or 'unknown'
+
+        if include_report and not assessment_context:
+            assessment_context = _build_request_assessment_context(
+                user_id=user_id,
+                user_role=user_role,
+                username=username,
+                report_record_id=report_record_id,
+            )
         
         # 打印用户消息到终端
         print(f"\n{'='*60}")
@@ -143,6 +160,7 @@ def chat():
                         prompt=user_message,
                         history=history,
                         emotion_context=emotion_context,
+                        assessment_context=assessment_context,
                         max_length=4096,
                         temperature=0.8,
                         enable_web_search=web_search,
@@ -191,6 +209,7 @@ def chat():
                     prompt=user_message,
                     history=history,
                     emotion_context=emotion_context,
+                    assessment_context=assessment_context,
                     max_length=4096,
                     temperature=0.8,
                     enable_web_search=web_search,
@@ -298,103 +317,30 @@ def get_latest_report():
     try:
         userinfo = session.get('userinfo', {})
         user_id = userinfo.get('id')
+        username = userinfo.get('username') or userinfo.get('name')
         
         if not user_id:
             return jsonify({
                 'status': 'error',
                 'message': '未登录'
             }), 401
-        
-        # 获取最新的已完成测评记录
-        from utils import db
-        test = db.fetch_one("""
-            SELECT * FROM test 
-            WHERE user_id = ? AND status = '已完成'
-            ORDER BY id DESC 
-            LIMIT 1
-        """, [user_id])
-        
-        if not test:
+
+        payload = get_latest_assessment_payload(
+            user_id=user_id,
+            username=username,
+            viewer_role=userinfo.get('role'),
+        )
+
+        if not payload:
             return jsonify({
                 'status': 'success',
                 'data': None,
                 'message': '暂无测评记录'
             })
-        
-        # 解析综合评分结果和表情数据
-        comprehensive_result = None
-        emotion_data = None
-        
-        if test.get('comprehensive_result'):
-            try:
-                comprehensive_result = json.loads(test['comprehensive_result'])
-            except:
-                comprehensive_result = None
-        
-        if test.get('emotion_data'):
-            try:
-                emotion_data = json.loads(test['emotion_data'])
-            except:
-                emotion_data = None
-        
-        # 构建SDS答题详情
-        sds_questions = [
-            "我觉得闷闷不乐，情绪低沉",
-            "我觉得一天之中早晨最好",
-            "我一阵阵哭出来或觉得想哭",
-            "我晚上睡眠不好",
-            "我吃得跟平常一样多",
-            "我与异性密切接触时和以往一样感到愉快",
-            "我发觉我的体重在下降",
-            "我有便秘的苦恼",
-            "我心跳比平常快",
-            "我无缘无故地感到疲乏",
-            "我的头脑跟平常一样清楚",
-            "我觉得经常做的事情并没有困难",
-            "我觉得不安而平静不下来",
-            "我对将来抱有希望",
-            "我比平常容易生气激动",
-            "我觉得作出决定是容易的",
-            "我觉得自己是个有用的人，有人需要我",
-            "我的生活过得很有意思",
-            "我认为如果我死了别人会生活得好些",
-            "平常感兴趣的事我仍然照样感兴趣"
-        ]
-        
-        details = []
-        if test.get('choose'):
-            for idx, (question, choice) in enumerate(zip(sds_questions, test['choose']), 1):
-                score = int(choice) if choice.isdigit() else 0
-                details.append({
-                    'question_id': idx,
-                    'question_text': question,
-                    'score': score
-                })
-        
-        # 格式化完成时间
-        finish_time = test.get('finish_time', '')
-        if finish_time:
-            try:
-                from datetime import datetime
-                if isinstance(finish_time, str):
-                    finish_time = datetime.fromisoformat(finish_time.replace('Z', '+00:00'))
-                finish_time = finish_time.strftime('%Y-%m-%d %H:%M')
-            except:
-                pass
-        
+
         return jsonify({
             'status': 'success',
-            'data': {
-                'record_id': test.get('id'),
-                'score': test.get('score', 0),
-                'result': test.get('result', '未知'),
-                'comprehensive_score': test.get('comprehensive_score'),
-                'comprehensive_result': comprehensive_result,
-                'emotion_data': emotion_data,
-                'finish_time': finish_time,
-                'use_time': test.get('use_time', 0),
-                'details': details
-            }
+            'data': payload
         })
     except Exception as e:
         logger.error(f"获取最新报告失败: {e}", exc_info=True)
@@ -442,6 +388,35 @@ def get_counseling_history():
 
 
 # ============= 辅助函数 =============
+
+
+def _parse_optional_int(value):
+    if value in (None, "", False):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        logger.warning("忽略非法 report_record_id: %r", value)
+        return None
+
+
+def _build_request_assessment_context(*, user_id, user_role, username, report_record_id=None):
+    payload = get_assessment_payload(
+        viewer_user_id=user_id,
+        viewer_role=user_role,
+        username=username,
+        report_record_id=report_record_id,
+    )
+    context = build_assessment_context(payload)
+    if context:
+        logger.info(
+            "已注入评估上下文: user=%s report_record_id=%s has_sds=%s scale_count=%s",
+            username,
+            report_record_id,
+            bool(payload and payload.get('record_id')),
+            len((payload or {}).get('latest_scales') or []),
+        )
+    return context or None
 
 
 def _try_route_chat_skill(

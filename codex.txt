@@ -1,0 +1,289 @@
+以下结论基于全局目录扫描、关键 Python/HTML 文件阅读，以及对 [depression.db](/home/ZR/data2/Depression/depression/my_flask_app/depression.db) 的表结构/记录数核对。当前仓库本质上不是一套干净的单体项目，而是两块技术资产叠在一起：`depression/` 是现行 Flask 本地演示系统，`EmoLLM/` 是模型/RAG/训练/演示资产仓。
+
+**第一部分：项目技术资产总览**
+主要技术栈：
+- Web 应用：Flask + Jinja2 + SQLite + 原生 JS/Alpine.js + Tailwind CDN + Chart.js + marked.js
+- 模型接入：OpenAI 兼容聊天接口封装、本地 vLLM、FastAPI RAG 服务
+- 语音：浏览器 `SpeechRecognition`、浏览器 `speechSynthesis`、后端 Dolphin ASR
+- 视觉：ONNX Runtime GPU 人脸检测/表情识别
+- 脑电：串口 EEG 接收与规则分类
+- 模型工程：Transformers / LangChain / FAISS / xtuner / 数据集处理脚本 / 多个本地模型目录
+
+前端、后端、模型、配置、资源位置：
+- 前端模板：[`templates`](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates)
+- 前端静态资源：[`static`](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/static)
+- Flask 后端：[`my_flask_app`](/home/ZR/data2/Depression/depression/my_flask_app)
+- 新功能模块：[`new_features`](/home/ZR/data2/Depression/depression/new_features)
+- 本地模型与推理文件：[`depression/models`](/home/ZR/data2/Depression/depression/models)、[`EmoLLM/model`](/home/ZR/data2/Depression/EmoLLM/model)、[`EmoLLM/rag/model`](/home/ZR/data2/Depression/EmoLLM/rag/model)
+- 配置与启动：[`depression/.env`](/home/ZR/data2/Depression/depression/.env)、[`depression/.env.example`](/home/ZR/data2/Depression/depression/.env.example)、[`depression/scripts`](/home/ZR/data2/Depression/depression/scripts)
+- 资源文件：[`static/video`](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/static/video)、[`static/picture`](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/static/picture)、[`EmoLLM/assets`](/home/ZR/data2/Depression/EmoLLM/assets)、[`EmoLLM/careyou/audio`](/home/ZR/data2/Depression/EmoLLM/careyou/audio)
+
+数据库现状：
+- [depression.db](/home/ZR/data2/Depression/depression/my_flask_app/depression.db) 当前表包括 `userinfo / test / scale_assessment_records / counseling_records / emotion_statistics`
+- 实际记录数：`userinfo=4`，`test=242`，`scale_assessment_records=2`，`counseling_records=231`
+
+目录树：
+```text
+/home/ZR/data2/Depression
+├── depression
+│   ├── docs
+│   │   ├── local_inference_standard.md
+│   │   └── project_handover_20260308.md
+│   ├── models
+│   │   ├── dolphin
+│   │   │   └── small.pt
+│   │   ├── faceDetection.onnx
+│   │   └── onnx_model_48.onnx
+│   ├── my_flask_app
+│   │   ├── app.py
+│   │   ├── depression.db
+│   │   ├── flask_app
+│   │   │   ├── __init__.py
+│   │   │   ├── utils
+│   │   │   │   └── eeg_receiver.py
+│   │   │   ├── views
+│   │   │   │   ├── account.py
+│   │   │   │   ├── main.py
+│   │   │   │   ├── psychological_counseling.py
+│   │   │   │   └── test.py
+│   │   │   ├── templates
+│   │   │   │   ├── base.html
+│   │   │   │   ├── counseling.html
+│   │   │   │   ├── history.html
+│   │   │   │   ├── comprehensive_detail.html
+│   │   │   │   ├── SDS_working2.html
+│   │   │   │   └── scale_assessment
+│   │   │   └── static
+│   │   │       ├── img
+│   │   │       ├── js
+│   │   │       ├── picture
+│   │   │       └── video
+│   │   └── utils
+│   │       ├── db.py
+│   │       ├── emollm_client.py
+│   │       ├── speech_recognition_dolphin.py
+│   │       ├── emotion_recognition_gpu.py
+│   │       └── simple_mjpeg_stream_gpu.py
+│   ├── new_features
+│   │   ├── assessment_context
+│   │   │   └── service.py
+│   │   ├── chat_intent_router
+│   │   │   └── policy.py
+│   │   ├── scale_assessment
+│   │   │   ├── api.py
+│   │   │   ├── definitions.py
+│   │   │   ├── engine.py
+│   │   │   └── repository.py
+│   │   ├── session_summary_skill
+│   │   │   ├── api.py
+│   │   │   ├── chat_skill.py
+│   │   │   └── service.py
+│   │   └── skill_router
+│   │       ├── base.py
+│   │       ├── registry.py
+│   │       └── router.py
+│   ├── scripts
+│   │   ├── start_llm_gpu.sh
+│   │   ├── start_rag.sh
+│   │   └── start_stack.sh
+│   ├── start_app_gpu.py
+│   └── start_app_npu.py
+└── EmoLLM
+    ├── rag_official_api.py
+    ├── rag
+    │   ├── src
+    │   │   ├── config/config.py
+    │   │   ├── data_processing.py
+    │   │   └── pipeline.py
+    │   ├── model
+    │   │   ├── embedding_model
+    │   │   └── rerank_model
+    │   └── merged_depression_kb
+    │       └── vector_db
+    ├── model
+    │   └── ...
+    ├── careyou
+    │   ├── app.py
+    │   ├── audio
+    │   │   ├── heart_girl
+    │   │   └── sunny_girl
+    │   ├── configs
+    │   └── rag/src
+    ├── datasets
+    ├── generate_data
+    ├── scripts/qa_generation
+    ├── xtuner_config
+    │   └── Qwen2-7B-Instruct_lora.py
+    ├── deploy
+    │   ├── api-file.py
+    │   └── api-file-fixed.py
+    └── front
+        └── Wechat small program prototype design
+```
+
+关键文件 10-20 个：
+| 文件 | 作用 |
+|---|---|
+| [start_app_gpu.py](/home/ZR/data2/Depression/depression/start_app_gpu.py) | GPU 启动脚本，检查 CUDA，初始化 ASR/表情/MJPEG |
+| [app.py](/home/ZR/data2/Depression/depression/my_flask_app/app.py) | Flask 入口，初始化数据库、迁移、静态路由 |
+| [__init__.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/__init__.py) | Flask app 工厂，注册蓝图和新功能模块 |
+| [account.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/account.py) | 登录、注册、个人信息 |
+| [test.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/test.py) | SDS 测评、语音处理、表情接口、EEG 接口、旧综合提交流程 |
+| [main.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/main.py) | 首页、历史页、详情页、综合报告页 |
+| [psychological_counseling.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/psychological_counseling.py) | 聊天 API、流式输出、历史存储、评估上下文注入 |
+| [db.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/db.py) | SQLite 封装，创建 `userinfo/test` 基础表 |
+| [emollm_client.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emollm_client.py) | LLM 接口封装，意图路由、RAG、联网搜索、流式聊天 |
+| [speech_recognition_dolphin.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/speech_recognition_dolphin.py) | Dolphin ASR 加载和音频转文本 |
+| [emotion_recognition_gpu.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emotion_recognition_gpu.py) | ONNX GPU 表情识别主实现 |
+| [eeg_receiver.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/utils/eeg_receiver.py) | 串口 EEG 接收、缓存、规则分类 |
+| [engine.py](/home/ZR/data2/Depression/depression/new_features/scale_assessment/engine.py) | PHQ-9/GAD-7 确定性评分引擎 |
+| [service.py](/home/ZR/data2/Depression/depression/new_features/assessment_context/service.py) | 聚合 SDS + 结构化量表为统一评估上下文 |
+| [service.py](/home/ZR/data2/Depression/depression/new_features/session_summary_skill/service.py) | 会话总结技能，支持 LLM 和 fallback |
+| [counseling.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/counseling.html) | 聊天 UI，含流式、浏览器语音输入、浏览器 TTS |
+| [SDS_working2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/SDS_working2.html) | 当前活跃的 SDS 作答页面，含语音、摄像头、EEG 轮询 |
+| [depression.db](/home/ZR/data2/Depression/depression/my_flask_app/depression.db) | 当前实际沉淀数据资产 |
+| [rag_official_api.py](/home/ZR/data2/Depression/EmoLLM/rag_official_api.py) | 当前 Flask 侧可调用的 RAG FastAPI |
+| [pipeline.py](/home/ZR/data2/Depression/EmoLLM/rag/src/pipeline.py) | RAG 检索与 rerank 主流程 |
+
+**第二部分：现有功能资产盘点**
+| 功能名称 | 当前状态 | 证据文件路径 | 说明 |
+|---|---|---|---|
+| 用户登录/注册/鉴权 | 已基本实现 | [account.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/account.py) / [__init__.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/__init__.py) | 有登录、注册、session 鉴权 |
+| SDS 量表答题与评分 | 已基本实现 | [test.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/test.py) / [SDS_working2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/SDS_working2.html) | 前端作答，后端计算 SDS 标准分并写 `test` |
+| SDS 历史记录/详情 | 已基本实现 | [main.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/main.py) / [history.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/history.html) / [detail.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/detail.html) | 有历史页、详情页、趋势图 |
+| PHQ-9 / GAD-7 结构化量表 | 已基本实现 | [api.py](/home/ZR/data2/Depression/depression/new_features/scale_assessment/api.py) / [engine.py](/home/ZR/data2/Depression/depression/new_features/scale_assessment/engine.py) / [repository.py](/home/ZR/data2/Depression/depression/new_features/scale_assessment/repository.py) | 有定义、评分、落库、结果页 |
+| AI 咨询聊天 | 已基本实现，依赖本地 LLM/RAG 服务 | [psychological_counseling.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/psychological_counseling.py) / [counseling.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/counseling.html) / [emollm_client.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emollm_client.py) | 支持流式输出、历史、评估数据注入 |
+| 咨询历史保存/读取 | 已基本实现 | [psychological_counseling.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/psychological_counseling.py) | `counseling_records` 表有实际数据 |
+| RAG / 联网搜索 / 意图路由 | 已基本实现，依赖外部服务 | [emollm_client.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emollm_client.py) / [rag_official_api.py](/home/ZR/data2/Depression/EmoLLM/rag_official_api.py) | 代码里是真接了 RAG、Tavily、路由策略 |
+| 会话总结技能 | 已基本实现 | [api.py](/home/ZR/data2/Depression/depression/new_features/session_summary_skill/api.py) / [service.py](/home/ZR/data2/Depression/depression/new_features/session_summary_skill/service.py) | 独立技能路由，支持 DB 历史总结 |
+| 浏览器语音输入 + 浏览器 TTS | 已基本实现 | [counseling.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/counseling.html) | 用浏览器 `SpeechRecognition` 和 `speechSynthesis` |
+| Dolphin 后端 ASR | 已基本实现 | [speech_recognition_dolphin.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/speech_recognition_dolphin.py) / [test.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/test.py) | 可处理音频并抽取 SDS 选项 |
+| 摄像头取帧 + 表情识别 | 已基本实现 | [SDS_working2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/SDS_working2.html) / [emotion_recognition_gpu.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emotion_recognition_gpu.py) / [test.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/test.py) | 前端 `getUserMedia`，后端 `/emotion/detect` |
+| EEG 串口接入与分类 | 部分实现 | [eeg_receiver.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/utils/eeg_receiver.py) / [test.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/test.py) | 接收和分类代码真实存在，但部分路由调用的方法已失配 |
+| 综合评分写库（问卷+表情+EEG） | 只做到接口占位/旧链路残留 | [test.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/test.py) / [SDS_working2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/SDS_working2.html) / [SDS_working.html](/home/ZR/data2/Depression/depression/backup/html_backup_20260120_142101/my_flask_app/flask_app/templates/SDS_working.html) | 有 `/SDS/submit_with_emotion`，但当前活跃页面只调用 `/SDS/submit` |
+| 综合报告页 | 只做到界面壳子 | [main.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/main.py) / [comprehensive_detail.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/comprehensive_detail.html) | 页面能打开，但核心分数/情绪分布含大量硬编码 |
+| 工作台 AI 洞察 / 心理科普卡片 | 只做到界面壳子 | [main2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/main2.html) | “AI 分析”“心理科普”文案和链接多为静态占位 |
+| 情绪上下文入聊 | 只做到接口占位 | [psychological_counseling.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/psychological_counseling.py) / [db.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/db.py) | 调的是不存在的表 `emotion_records/test_records` 和不存在的方法 `fetchone/fetchall` |
+| 小程序端 | 只在原型资料里出现过 | [EmoLLM原型图.md](/home/ZR/data2/Depression/EmoLLM/front/Wechat%20small%20program%20prototype%20design/EmoLLM原型图.md) | 是原型图和图片，不是可运行前端 |
+| 数字人/虚拟陪伴 | 只在 README/命名里出现过 | [README.md](/home/ZR/data2/Depression/EmoLLM/README.md) / [careyou/README.md](/home/ZR/data2/Depression/EmoLLM/careyou/README.md) | README 提到“心理数字人分项”，但 `careyou` 明写 `❌Virtual mental companion` |
+| 人脸身份识别 | 完全没有代码证据 | 未发现代码证据 | 有人脸检测/表情识别，不等于身份识别 |
+| 音乐播放 | 完全没有代码证据 | 未发现代码证据 | 未见业务层音乐播放器或播放控制代码 |
+| 数字人驱动/动作/角色动画 | 完全没有代码证据 | 未发现代码证据 | 未见 Live2D、驱动、动作控制、角色动画代码 |
+
+**第三部分：可复用资产识别**
+| 资产名称 | 类型 | 文件路径 | 可复用程度 | 原因 |
+|---|---|---|---|---|
+| Flask 多蓝图骨架 | 后端结构 | [__init__.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/__init__.py) | 中 | 结构清楚，但有硬编码 secret 和旧残留 |
+| 结构化量表评分引擎 | 数据结构/业务内核 | [engine.py](/home/ZR/data2/Depression/depression/new_features/scale_assessment/engine.py) | 高 | 规则明确、确定性强、与 UI 解耦 |
+| 结构化量表仓储 | 数据持久化 | [repository.py](/home/ZR/data2/Depression/depression/new_features/scale_assessment/repository.py) | 高 | 表结构和读写边界清晰 |
+| 统一评估上下文拼装 | 数据聚合 | [service.py](/home/ZR/data2/Depression/depression/new_features/assessment_context/service.py) | 高 | 可直接作为“报告上下文层”复用 |
+| LLM 调用封装 | 接口封装 | [emollm_client.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emollm_client.py) | 中 | 功能全，但耦合 env 和路由策略 |
+| 会话总结技能 | 技能模块 | [service.py](/home/ZR/data2/Depression/depression/new_features/session_summary_skill/service.py) | 中 | 单体小、边界清晰、易迁移 |
+| Skill Router / Intent Router | 路由结构 | [router.py](/home/ZR/data2/Depression/depression/new_features/skill_router/router.py) / [policy.py](/home/ZR/data2/Depression/depression/new_features/chat_intent_router/policy.py) | 中 | 够轻，可作为后续可插拔路由起点 |
+| 聊天页面原型 | UI 原型 | [counseling.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/counseling.html) | 中 | 聊天、流式、语音、TTS 都有真实交互 |
+| 基础布局与通用视觉壳 | UI 样式/布局 | [base.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/base.html) | 中 | 可作为原型外壳，但权限显示逻辑不可靠 |
+| 历史页/详情页 | 页面组件 | [history.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/history.html) / [detail.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/detail.html) | 中 | 页面完整度高，适合做 UI 参考 |
+| Dolphin ASR 接入 | 模型调用代码 | [speech_recognition_dolphin.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/speech_recognition_dolphin.py) | 中 | 本地模型真实可用，但依赖环境重 |
+| ONNX 表情识别 | 模型调用代码 | [emotion_recognition_gpu.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emotion_recognition_gpu.py) | 中 | 模型和接口都在，但 CPU fallback 基本是 stub |
+| EEG 接收内核 | 硬件接入代码 | [eeg_receiver.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/utils/eeg_receiver.py) | 低 | 核心接收是真实的，但对外接口已不一致 |
+| RAG API 与检索管线 | 模型服务 | [rag_official_api.py](/home/ZR/data2/Depression/EmoLLM/rag_official_api.py) / [pipeline.py](/home/ZR/data2/Depression/EmoLLM/rag/src/pipeline.py) | 高 | 已是独立服务边界，最适合直接复用 |
+| 向量库与知识库文本 | 数据资产 | [EmoLLM/rag](/home/ZR/data2/Depression/EmoLLM/rag) | 中 | 有现成向量库和资料，但需重新验收质量 |
+| 本地模型目录 | 模型资产 | [EmoLLM/model](/home/ZR/data2/Depression/EmoLLM/model) | 中 | 是真实资产，但体积大、环境要求高 |
+| 视频/图片/角色音色资源 | 资源文件 | [static/video](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/static/video) / [careyou/audio](/home/ZR/data2/Depression/EmoLLM/careyou/audio) | 低 | 可做原型素材，但工程复用价值有限 |
+| 启动脚本 | 运维脚本 | [scripts](/home/ZR/data2/Depression/depression/scripts) | 中 | 对本地联调有价值 |
+
+**第四部分：应废弃或谨慎使用的部分**
+| 模块/文件 | 问题类型 | 文件路径 | 为什么建议废弃或谨慎使用 |
+|---|---|---|---|
+| 聊天情绪上下文查询 | 逻辑明显混乱 | [psychological_counseling.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/psychological_counseling.py) | 读取不存在的 `emotion_records/test_records`，还调用不存在的 `db.fetchone/db.fetchall` |
+| EEG 路由层 | 接口失配 | [test.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/test.py) | 调用了 `receiver.get_latest_data/get_stream_data`，但接收器里没有这些方法 |
+| EEG 测试脚本 | 失效脚本 | [test_eeg.py](/home/ZR/data2/Depression/depression/my_flask_app/test_eeg.py) | 同样依赖不存在的 EEG 方法 |
+| 综合报告页面 | 假流程代码 | [comprehensive_detail.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/comprehensive_detail.html) | 65/60 分、45/30/15 情绪比例、EEG 缺失提示均是硬编码 |
+| 首页综合分计算 | 假流程代码 | [main.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/main.py) | 综合分直接用默认表情 65、EEG 60 参与计算 |
+| 当前 SDS 主页面 | 链路未闭环 | [SDS_working2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/SDS_working2.html) | 采集了摄像头和 EEG，但最终只提交 `/SDS/submit`，不落多模态结果 |
+| 旧版备份页面 | 历史残留 | [SDS_working.html](/home/ZR/data2/Depression/depression/backup/html_backup_20260120_142101/my_flask_app/flask_app/templates/SDS_working.html) | 里面有更完整旧链路，但不在当前运行主链上 |
+| 情绪识别前端脚本 | 重复/未使用代码 | [emotion-recognition.js](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/static/js/emotion-recognition.js) | 当前模板未引用；`test.py` 注释也说明新版不使用它 |
+| 增强视频播放器脚本 | 演示性代码 | [enhanced-video-player.js](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/static/js/enhanced-video-player.js) | 当前模板未引用 |
+| 数据迁移脚本 | 与未来重构关系小 | [db_migration_emotion.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/db_migration_emotion.py) | 硬编码旧绝对路径，明显是一次性迁移脚本 |
+| NPU 分支 | 旧版本残留 | [start_app_npu.py](/home/ZR/data2/Depression/depression/start_app_npu.py) / [emotion_recognition_npu.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emotion_recognition_npu.py) | 项目交接文档已明确当前运行在 GPU，NPU 文件为旧残留 |
+| 权限角色判断 | 命名/结构误导 | [base.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/base.html) / [main.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/main.py) / [api.py](/home/ZR/data2/Depression/depression/new_features/scale_assessment/api.py) | 有的把 `role==1` 当管理员，有的把 `role==2` 当管理员，还有的两者都算 |
+| 配置文件 | 谨慎使用 | [depression/.env](/home/ZR/data2/Depression/depression/.env) | 已提交真实密钥和本机地址，不适合继续直接沿用 |
+| Flask app 配置 | 谨慎使用 | [__init__.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/__init__.py) | `secret_key` 硬编码 |
+| EmoLLM 多个 demo 启动器 | 试验性代码 | [app.py](/home/ZR/data2/Depression/EmoLLM/app.py) / [app_Llama3_Gradio.py](/home/ZR/data2/Depression/EmoLLM/app_Llama3_Gradio.py) / [deploy/api-file.py](/home/ZR/data2/Depression/EmoLLM/deploy/api-file.py) / [agents/code.py](/home/ZR/data2/Depression/EmoLLM/agents/code.py) | 多为 demo、独立启动器或实验分支，不是当前主系统的一部分 |
+
+**第五部分：现有项目的真实技术边界**
+现在前端实际上最多能支撑到：
+- 一套服务端渲染的多页面原型系统：登录、量表、历史、结果、聊天、图表、浏览器语音输入、浏览器 TTS、摄像头取帧、本地状态缓存。
+- 不能认为已经支撑“稳定的多模态闭环应用”。当前多模态采集和最终落库/报告页之间是断的。
+
+现在后端实际上最多能支撑到：
+- SQLite 用户/测评/咨询记录 CRUD。
+- SDS 评分、PHQ-9/GAD-7 评分、聊天代理、本地 LLM/RAG 调用、Dolphin ASR、ONNX 表情识别、部分 EEG 接入。
+- 不能认为已经稳定支撑“表情+EEG+量表”的统一生产链路，相关接口存在明显失配和硬编码。
+
+是否有真实可调用的模型/API：
+- 有。[`depression/.env`](/home/ZR/data2/Depression/depression/.env) 指向本地 OpenAI 兼容聊天接口 `127.0.0.1:8000` 和本地 RAG 接口 `127.0.0.1:8001`。
+- 有。本地 ASR 模型 [`small.pt`](/home/ZR/data2/Depression/depression/models/dolphin/small.pt)。
+- 有。本地表情模型 [`faceDetection.onnx`](/home/ZR/data2/Depression/depression/models/faceDetection.onnx) 和 [`onnx_model_48.onnx`](/home/ZR/data2/Depression/depression/models/onnx_model_48.onnx)。
+- 有。`EmoLLM` 下存在实际模型、向量库、训练配置和数据集。
+- 但这些都依赖本机环境、显卡、进程和硬件，不代表仓库本身已经整理成稳定可交付系统。
+
+代码证据核对：
+- 文本输入：有代码证据。见 [counseling.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/counseling.html)
+- 语音输入：有代码证据。见 [counseling.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/counseling.html)、[SDS_working2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/SDS_working2.html)、[speech_recognition_dolphin.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/speech_recognition_dolphin.py)
+- TTS：有代码证据。当前主应用是浏览器 TTS，见 [counseling.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/counseling.html)；`EmoLLM/careyou` 还有服务端 TTS demo，见 [careyou/app.py](/home/ZR/data2/Depression/EmoLLM/careyou/app.py)
+- 图片展示：有代码证据。见 [`static`](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/static) 和各模板
+- 音乐播放：未发现代码证据
+- 摄像头：有代码证据。见 [SDS_working2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/SDS_working2.html)
+- 面部识别：仅发现人脸检测/表情识别代码证据，见 [emotion_recognition_gpu.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emotion_recognition_gpu.py)；未发现“身份识别”代码证据
+- 脑电相关接入：有代码证据。见 [eeg_receiver.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/utils/eeg_receiver.py)
+- 数字人驱动、动作、角色动画：未发现代码证据
+
+**第六部分：重构起点建议**
+保留：
+- [scale_assessment](/home/ZR/data2/Depression/depression/new_features/scale_assessment)
+- [assessment_context/service.py](/home/ZR/data2/Depression/depression/new_features/assessment_context/service.py)
+- [emollm_client.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emollm_client.py)
+- [session_summary_skill](/home/ZR/data2/Depression/depression/new_features/session_summary_skill)
+- [rag_official_api.py](/home/ZR/data2/Depression/EmoLLM/rag_official_api.py) 和 [`EmoLLM/rag/src`](/home/ZR/data2/Depression/EmoLLM/rag/src)
+- [speech_recognition_dolphin.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/speech_recognition_dolphin.py)
+- [emotion_recognition_gpu.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/emotion_recognition_gpu.py)
+- [scripts](/home/ZR/data2/Depression/depression/scripts)
+
+参考：
+- [base.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/base.html)
+- [counseling.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/counseling.html)
+- [history.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/history.html)
+- [detail.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/detail.html)
+- [main2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/main2.html)
+- [SDS_working2.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/SDS_working2.html)
+- [backup/SDS_working.html](/home/ZR/data2/Depression/depression/backup/html_backup_20260120_142101/my_flask_app/flask_app/templates/SDS_working.html)
+- [EmoLLM/front](/home/ZR/data2/Depression/EmoLLM/front)
+- [EmoLLM/careyou/app.py](/home/ZR/data2/Depression/EmoLLM/careyou/app.py)
+
+废弃：
+- [psychological_counseling.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/psychological_counseling.py) 里旧的情绪上下文查询段
+- [test.py](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/views/test.py) 里失配的 EEG 路由段和旧综合提交流程
+- [test_eeg.py](/home/ZR/data2/Depression/depression/my_flask_app/test_eeg.py)
+- [comprehensive_detail.html](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/templates/comprehensive_detail.html) 当前实现
+- [emotion-recognition.js](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/static/js/emotion-recognition.js)
+- [enhanced-video-player.js](/home/ZR/data2/Depression/depression/my_flask_app/flask_app/static/js/enhanced-video-player.js)
+- [db_migration_emotion.py](/home/ZR/data2/Depression/depression/my_flask_app/utils/db_migration_emotion.py)
+- [start_app_npu.py](/home/ZR/data2/Depression/depression/start_app_npu.py) 及相关 NPU 文件
+- [depression/.env](/home/ZR/data2/Depression/depression/.env) 当前内容
+- [EmoLLM/app.py](/home/ZR/data2/Depression/EmoLLM/app.py) / [app_Llama3_Gradio.py](/home/ZR/data2/Depression/EmoLLM/app_Llama3_Gradio.py) / [deploy](/home/ZR/data2/Depression/EmoLLM/deploy)
+
+如果只做一个最小实验样机，现有代码最可能支撑的是：
+- “结构化量表评分 + 结果页/历史页 + 聊天接口（可带最近测评上下文）”
+- 次优起点是 “SDS 问卷单链路 + 聊天”
+- 最不适合作为起点的是 “表情 + EEG + 综合报告闭环”，因为当前代码证据显示这条链路并没有真正打通
+
+**第七部分：给 ChatGPT 继续使用的摘要**
+《项目代码资产摘要》：
+- 技术栈：Flask + Jinja2 + SQLite + 原生 JS/Alpine.js；本地 OpenAI 兼容 LLM；FastAPI RAG；Dolphin ASR；ONNX GPU 表情识别；串口 EEG；另带 `EmoLLM` 的模型、向量库、训练配置和 demo 资产。
+- 当前已有的真实能力：登录注册；SDS；PHQ-9/GAD-7；历史与详情；聊天 API 与流式输出；评估上下文注入；会话总结技能；浏览器语音输入与浏览器 TTS；本地 ASR；摄像头取帧；表情识别；部分 EEG 接入；本地 RAG 服务。
+- 当前仅有壳子的部分：综合报告页、首页 AI 洞察、心理科普卡片、多模态综合评分主链路。
+- 完全缺失的关键部分：数字人驱动、动作/角色动画、人脸身份识别、音乐播放业务代码。
+- 可复用资产：`scale_assessment` 整套模块、`assessment_context`、`emollm_client`、`session_summary_skill`、`EmoLLM/rag` 服务与向量库、聊天页原型、历史页/详情页原型、Dolphin ASR、ONNX 表情识别、启动脚本。
+- 建议废弃部分：聊天里旧情绪上下文查询、失配 EEG 路由、旧综合提交流程、当前综合报告页、未引用静态 JS、NPU 残留、一次性迁移脚本、机密已提交的 `.env`、多个 Streamlit/Gradio/demo 启动器。
+- 最适合作为重构起点的内容：结构化量表模块 + 统一评估上下文层 + 聊天接口/RAG 层；UI 仅把现有 `counseling/history/detail/base` 当原型参考，不要把现有多模态流程当作正确业务流程。

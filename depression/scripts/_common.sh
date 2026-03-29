@@ -76,6 +76,10 @@ load_env() {
     RAG_HEALTH_URL
     APP_HEALTH_URL
     LLM_HEALTH_AUTH_KEY
+    LLM_DTYPE
+    LLM_MAX_MODEL_LEN
+    LLM_GPU_MEMORY_UTILIZATION
+    LLM_MAX_NUM_SEQS
     STACK_LOG_MODE
     LLM_PORT
     RAG_PORT
@@ -142,11 +146,19 @@ http_code() {
   local url="$1"
   local timeout="${2:-3}"
   local header="${3:-}"
+  local -a curl_args
+
+  curl_args=(-s -o /dev/null -m "${timeout}" -w "%{http_code}")
+
+  # Local stack health checks should not inherit shell proxy settings.
+  if [[ "${url}" =~ ^https?://(127\.0\.0\.1|localhost|0\.0\.0\.0)(:[0-9]+)?([/?].*)?$ ]]; then
+    curl_args+=(--noproxy "*")
+  fi
 
   if [[ -n "${header}" ]]; then
-    curl -s -o /dev/null -m "${timeout}" -w "%{http_code}" -H "${header}" "${url}" || true
+    curl "${curl_args[@]}" -H "${header}" "${url}" || true
   else
-    curl -s -o /dev/null -m "${timeout}" -w "%{http_code}" "${url}" || true
+    curl "${curl_args[@]}" "${url}" || true
   fi
 }
 

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}量表筛查{% endblock %}
+
+{% block breadcrumb %}
+<span>测评服务</span>
+<i class="fa-solid fa-chevron-right text-[10px]"></i>
+<span class="text-textPrimary font-medium">量表筛查</span>
+{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-6 lg:px-8">
+    <section class="bg-white shadow-card rounded-card border border-white/70 overflow-hidden">
+        <div class="p-6 sm:p-8 bg-gradient-to-r from-sky-50 via-white to-emerald-50 border-b border-gray-100">
+            <p class="text-sm font-semibold tracking-[0.18em] text-[#165DFF] uppercase">Scale Assessment</p>
+            <h1 class="mt-3 text-3xl font-bold text-textPrimary">PHQ-9 / GAD-7 结构化量表筛查</h1>
+            <p class="mt-3 max-w-3xl text-sm sm:text-base text-textSecondary leading-7">
+                当前先支持 PHQ-9 与 GAD-7。计分与分级完全由规则引擎完成，不依赖 LLM。后续结果可继续接入自动问诊与干预模块。
+            </p>
+        </div>
+
+        <div class="p-6 sm:p-8 grid gap-5 lg:grid-cols-2">
+            {% for scale in scales %}
+            <a href="{{ url_for('scale_assessment.scale_form', scale_slug=scale.slug) }}"
+               class="group rounded-card border border-border bg-slate-50/70 hover:bg-white hover:border-[#165DFF]/30 hover:shadow-card-hover transition-all p-6 flex flex-col gap-4">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-textTertiary">{{ scale.short_name }}</p>
+                        <h2 class="mt-2 text-xl font-semibold text-textPrimary">{{ scale.name }}</h2>
+                    </div>
+                    <div class="w-12 h-12 rounded-2xl bg-[#165DFF]/10 text-[#165DFF] flex items-center justify-center text-xl group-hover:scale-105 transition-transform">
+                        <i class="fa-solid fa-clipboard-question"></i>
+                    </div>
+                </div>
+                <p class="text-sm text-textSecondary leading-7">{{ scale.description }}</p>
+                <div class="flex items-center justify-between pt-2">
+                    <span class="text-xs text-textTertiary">规则计分 · 结构化输出</span>
+                    <span class="inline-flex items-center gap-2 text-sm font-medium text-[#165DFF]">
+                        开始填写
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </span>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

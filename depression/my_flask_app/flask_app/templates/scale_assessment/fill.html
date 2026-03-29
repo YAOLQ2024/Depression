@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}{{ scale["short_name"] }} 量表填写{% endblock %}
+
+{% block breadcrumb %}
+<a href="{{ url_for('scale_assessment.scale_home') }}" class="hover:text-textPrimary">量表筛查</a>
+<i class="fa-solid fa-chevron-right text-[10px]"></i>
+<span class="text-textPrimary font-medium">{{ scale["short_name"] }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-6 lg:px-8">
+    <section class="bg-white shadow-card rounded-card border border-white/70 overflow-hidden">
+        <div class="px-6 py-6 sm:px-8 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-white">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.18em] text-textTertiary">{{ scale["short_name"] }}</p>
+                    <h1 class="mt-2 text-2xl sm:text-3xl font-bold text-textPrimary">{{ scale["name"] }}</h1>
+                    <p class="mt-3 text-sm text-textSecondary">{{ scale["intro"] }}</p>
+                </div>
+                <div class="rounded-2xl bg-[#165DFF]/8 text-[#165DFF] px-4 py-3 text-sm font-medium">
+                    共 {{ scale["items"]|length }} 题
+                </div>
+            </div>
+        </div>
+
+        <form method="post" action="{{ url_for('scale_assessment.scale_submit', scale_slug=scale["slug"]) }}" class="px-6 py-6 sm:px-8">
+            <input type="hidden" name="started_at" value="{{ started_at }}">
+            <div class="space-y-5">
+                {% for item in scale["items"] %}
+                <section class="rounded-card border border-border bg-slate-50/60 p-5">
+                    <div class="flex items-start gap-3">
+                        <div class="w-9 h-9 shrink-0 rounded-xl bg-[#165DFF]/10 text-[#165DFF] font-semibold flex items-center justify-center">
+                            {{ item.index }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <h2 class="text-base font-semibold text-textPrimary leading-7">{{ item.text }}</h2>
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                {% for option in scale["options"] %}
+                                {% set option_id = scale["slug"] ~ "-" ~ item.id ~ "-" ~ option.value %}
+                                <div class="relative">
+                                    <input
+                                        id="{{ option_id }}"
+                                        type="radio"
+                                        name="{{ item.id }}"
+                                        value="{{ option.value }}"
+                                        class="peer pointer-events-none absolute h-0 w-0 opacity-0"
+                                        tabindex="-1"
+                                        aria-hidden="true"
+                                        required
+                                    >
+                                    <button
+                                        type="button"
+                                        data-radio-target="{{ option_id }}"
+                                        class="block h-full w-full rounded-2xl border border-border bg-white px-4 py-3 text-left transition-all peer-checked:border-[#165DFF] peer-checked:bg-[#165DFF]/8 peer-checked:shadow-sm hover:border-[#165DFF]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#165DFF]/20 focus-visible:ring-offset-2"
+                                    >
+                                        <div class="flex items-center justify-between gap-3">
+                                            <span class="text-sm font-medium text-textPrimary">{{ option.label }}</span>
+                                            <span class="text-xs text-textTertiary">分值 {{ option.value }}</span>
+                                        </div>
+                                        <p class="mt-2 text-xs leading-6 text-textSecondary">{{ option.description }}</p>
+                                    </button>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </section>
+                {% endfor %}
+            </div>
+
+            <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p class="text-sm text-textSecondary">提交后将生成结构化分级结果，并保存到本地数据库。</p>
+                <div class="flex gap-3">
+                    <a href="{{ url_for('scale_assessment.scale_home') }}"
+                       class="px-5 py-3 rounded-btn border border-border text-textSecondary hover:bg-slate-50 transition-colors">
+                        返回
+                    </a>
+                    <button type="submit"
+                            class="px-6 py-3 rounded-btn bg-[#165DFF] text-white font-medium hover:bg-[#0E42D2] transition-colors shadow-sm">
+                        提交并解析
+                    </button>
+                </div>
+            </div>
+        </form>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('[data-radio-target]').forEach((button) => {
+        button.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+        });
+
+        button.addEventListener('click', () => {
+            const input = document.getElementById(button.dataset.radioTarget);
+            if (!input) return;
+
+            input.checked = true;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+    });
+});
+</script>
+{% endblock %}

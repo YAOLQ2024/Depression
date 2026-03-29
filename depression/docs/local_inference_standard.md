@@ -36,6 +36,10 @@ chmod +x scripts/*.sh
 - If unhealthy, starts vLLM on GPU using:
   - model path default: `../EmoLLM/model/EmoLLM_Qwen2-7B-Instruct_lora`
   - served model default: `${SILICONFLOW_MODEL}` from `.env`
+  - low-memory defaults:
+    - `LLM_MAX_MODEL_LEN=2048`
+    - `LLM_GPU_MEMORY_UTILIZATION=0.60`
+    - `LLM_MAX_NUM_SEQS=2`
 
 2. `start_rag.sh`
 
@@ -84,6 +88,10 @@ APP_START_CMD=python3 start_app_gpu.py
 
 EMOLLM_ROOT=/home/ZR/data2/Depression/EmoLLM
 LLM_MODEL_PATH=/home/ZR/data2/Depression/EmoLLM/model/EmoLLM_Qwen2-7B-Instruct_lora
+LLM_DTYPE=auto
+LLM_MAX_MODEL_LEN=2048
+LLM_GPU_MEMORY_UTILIZATION=0.60
+LLM_MAX_NUM_SEQS=2
 
 LLM_HEALTH_URL=http://127.0.0.1:8000/v1/models
 RAG_HEALTH_URL=http://127.0.0.1:8001/health

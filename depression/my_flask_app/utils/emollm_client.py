@@ -13,9 +13,18 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 import time
+from urllib.parse import urlparse
 
 from new_features.chat_intent_router.policy import (
+    GREETING_REPLY,
+    INTENT_GENERAL,
+    INTENT_CASUAL,
+    INTENT_IDENTITY,
     INTENT_PSYCHOLOGY,
+    IDENTITY_REPLY,
+    REALTIME_REFUSAL,
+    REALTIME_UNAVAILABLE,
+    THANKS_REPLY,
     ChatIntentDecision,
     classify_chat_intent,
 )
@@ -58,10 +67,15 @@ class EmoLLMClient:
         self.rag_kb = os.getenv("RAG_KB", "merged_depression_kb")
         self.rag_retrieval_num = int(os.getenv("RAG_RETRIEVAL_NUM", "10"))
         self.rag_select_num = int(os.getenv("RAG_SELECT_NUM", "5"))
+        self.llm_router_enabled = os.getenv("CHAT_ROUTER_LLM_ENABLED", "1") == "1"
+        self.llm_router_timeout = max(3, int(os.getenv("CHAT_ROUTER_LLM_TIMEOUT", "8")))
+        self.llm_router_max_tokens = max(64, min(int(os.getenv("CHAT_ROUTER_LLM_MAX_TOKENS", "160")), 512))
         
         self.timeout = timeout or 120  # 默认超时时间120秒
         self.max_retries = max_retries
         self.session = self._create_session()
+        self.local_session = self._create_session(trust_env=False)
+        self.direct_session = self._create_session(trust_env=False, include_auth=False)
         
         if not self.api_key:
             logger.warning("未设置硅基流动API密钥，请设置环境变量 SILICONFLOW_API_KEY 或在代码中配置")
@@ -71,9 +85,10 @@ class EmoLLMClient:
         
         logger.info(f"心理咨询客户端初始化: 模型={self.model}, API地址={self.api_url}")
     
-    def _create_session(self) -> requests.Session:
+    def _create_session(self, trust_env: bool = True, include_auth: bool = True) -> requests.Session:
         """创建HTTP会话（支持连接池）"""
         session = requests.Session()
+        session.trust_env = trust_env
         # 配置连接池
         adapter = requests.adapters.HTTPAdapter(
             pool_connections=10,
@@ -84,13 +99,40 @@ class EmoLLMClient:
         session.mount('https://', adapter)
         
         # 设置默认请求头（硅基流动API需要）
-        if self.api_key:
+        if include_auth and self.api_key:
             session.headers.update({
                 'Authorization': f'Bearer {self.api_key}',
                 'Content-Type': 'application/json'
             })
         
         return session
+
+    def _uses_local_url(self, url: str) -> bool:
+        try:
+            host = (urlparse(str(url or "")).hostname or "").lower()
+        except Exception:
+            return False
+        return host in {"127.0.0.1", "localhost", "0.0.0.0"}
+
+    def _session_for_url(self, url: str) -> requests.Session:
+        return self.local_session if self._uses_local_url(url) else self.session
+
+    def _post(self, url: str, **kwargs):
+        return self._session_for_url(url).post(url, **kwargs)
+
+    def _tavily_timeouts(self) -> Tuple[int, int]:
+        """Keep Tavily slightly looser than local inference endpoints."""
+        return (5, 20)
+
+    def _request_tavily(self, search_data: Dict, session: requests.Session) -> Dict:
+        connect_timeout, read_timeout = self._tavily_timeouts()
+        response = session.post(
+            self.tavily_api_url,
+            json=search_data,
+            timeout=(connect_timeout, read_timeout),
+        )
+        response.raise_for_status()
+        return response.json()
 
     def _classify_intent(self, prompt: str, enable_web_search: bool) -> ChatIntentDecision:
         """Classify the current user message before building prompts."""
@@ -109,9 +151,396 @@ class EmoLLMClient:
         )
         return decision
 
+    def _decide_route(
+        self,
+        prompt: str,
+        *,
+        enable_web_search: bool,
+        assessment_context: Optional[str] = None,
+    ) -> ChatIntentDecision:
+        decision = self._classify_intent(prompt, enable_web_search)
+        decision = self._adjust_decision_for_assessment_context(decision, assessment_context)
+        decision = self._refine_decision_with_llm(prompt, enable_web_search, decision)
+        return decision
+
+    def _adjust_decision_for_assessment_context(
+        self,
+        decision: ChatIntentDecision,
+        assessment_context: Optional[str],
+    ) -> ChatIntentDecision:
+        """Upgrade vague requests with attached assessment data into psychology routing."""
+        if not assessment_context or decision.intent != INTENT_GENERAL:
+            return decision
+
+        adjusted = ChatIntentDecision(
+            intent=INTENT_PSYCHOLOGY,
+            use_rag=True,
+            use_web_search=False,
+            direct_response=None,
+            response_style="psychology",
+            reason="assessment-context",
+        )
+        logger.info(
+            "[Route] intent override=%s->%s rag=%s reason=%s",
+            decision.intent,
+            adjusted.intent,
+            adjusted.use_rag,
+            adjusted.reason,
+        )
+        return adjusted
+
+    def _refine_decision_with_llm(
+        self,
+        prompt: str,
+        enable_web_search: bool,
+        decision: ChatIntentDecision,
+    ) -> ChatIntentDecision:
+        if decision.reason != "default-general":
+            return decision
+        if not self.llm_router_enabled:
+            return decision
+
+        llm_decision = self._classify_intent_with_llm(prompt, enable_web_search)
+        if not llm_decision:
+            fallback_decision = self._fallback_to_search_when_user_enabled(prompt, enable_web_search, decision)
+            if fallback_decision:
+                logger.info(
+                    "[Route] search-toggle fallback intent=%s rag=%s web_search=%s reason=%s",
+                    fallback_decision.intent,
+                    fallback_decision.use_rag,
+                    fallback_decision.use_web_search,
+                    fallback_decision.reason,
+                )
+                return fallback_decision
+            logger.info("[Route] llm-refine skipped: no upgrade for prompt=%s", str(prompt or "")[:60])
+            return decision
+
+        logger.info(
+            "[Route] llm-refine intent=%s rag=%s web_search=%s direct=%s reason=%s",
+            llm_decision.intent,
+            llm_decision.use_rag,
+            llm_decision.use_web_search,
+            bool(llm_decision.direct_response),
+            llm_decision.reason,
+        )
+        return llm_decision
+
+    def _classify_intent_with_llm(
+        self,
+        prompt: str,
+        enable_web_search: bool,
+    ) -> Optional[ChatIntentDecision]:
+        text = str(prompt or "").strip()
+        if not text:
+            return None
+
+        system_prompt = (
+            "你是聊天路由分类器，不负责回答用户，只负责输出路由决策。"
+            "请只输出单行 JSON，不要使用 markdown，不要补充说明。\n"
+            "JSON 字段固定为："
+            '{"intent":"casual|identity|realtime|psychology|general",'
+            '"realtime_kind":"none|local_datetime|calendar_lunar|latest_fact",'
+            '"confidence":"high|medium|low",'
+            '"reason":"简短英文短语"}\n'
+            "判定规则：\n"
+            "1. psychology：心理、情绪、压力、咨询、量表、报告解读、自我状态分析。\n"
+            "2. realtime/local_datetime：问今天几号、现在几点、星期几、当前时间等，系统时间可直接回答。\n"
+            "3. realtime/calendar_lunar：问农历、阴历、黄历、初几、节气、法定节假日等，需要结合当前日期查询。\n"
+            "4. realtime/latest_fact：问天气、新闻、最新事件、股价、汇率、比分、现任身份、近期政策等需要最新外部事实的问题。\n"
+            "5. identity：问你是谁、你能做什么。\n"
+            "6. casual：打招呼、感谢、寒暄。\n"
+            "7. general：其他稳定知识、写作、解释、通用问答。\n"
+            "如果不确定，只有在明显依赖当前外部世界状态时才判为 realtime。"
+        )
+        request_data = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"用户问题：{text}"},
+            ],
+            "temperature": 0.0,
+            "top_p": 0.1,
+            "max_tokens": self.llm_router_max_tokens,
+            "stream": False,
+        }
+
+        try:
+            response = self._post(
+                self.api_url,
+                json=request_data,
+                timeout=(3, self.llm_router_timeout),
+            )
+            response.raise_for_status()
+            data = response.json()
+            choices = data.get("choices") or []
+            if not choices:
+                logger.info("[Route] llm router returned no choices for prompt=%s", text[:60])
+                return None
+            content = (choices[0].get("message") or {}).get("content", "")
+            logger.info("[Route] llm router raw=%s", str(content or "").strip()[:300])
+            parsed = self._parse_router_json(content)
+            if not parsed:
+                return None
+            return self._build_llm_router_decision(
+                prompt=text,
+                parsed=parsed,
+                enable_web_search=enable_web_search,
+            )
+        except Exception as exc:
+            logger.warning("[Route] llm router failed: %s", exc)
+            return None
+
+    def _parse_router_json(self, content: str) -> Optional[Dict[str, str]]:
+        text = str(content or "").strip()
+        if not text:
+            return None
+
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*", "", text)
+            text = re.sub(r"\s*```$", "", text)
+
+        try:
+            return json.loads(text)
+        except Exception:
+            match = re.search(r"\{.*\}", text, re.S)
+            if match:
+                try:
+                    return json.loads(match.group(0))
+                except Exception:
+                    pass
+
+            parsed = self._parse_router_text_fallback(text)
+            if parsed:
+                return parsed
+
+            logger.warning("[Route] llm router parse failed: %s", text[:200])
+            return None
+
+    def _parse_router_text_fallback(self, text: str) -> Optional[Dict[str, str]]:
+        raw = str(text or "").strip()
+        if not raw:
+            return None
+
+        intent = self._extract_enum_value(raw.lower(), ("casual", "identity", "realtime", "psychology", "general"))
+        realtime_kind = self._extract_enum_value(raw.lower(), ("local_datetime", "calendar_lunar", "latest_fact", "none"))
+        confidence = self._extract_enum_value(raw.lower(), ("high", "medium", "low"))
+
+        if not intent and "心理" in raw:
+            intent = "psychology"
+        if not intent and ("实时" in raw or "联网" in raw or "最新" in raw):
+            intent = "realtime"
+        if not realtime_kind and ("农历" in raw or "黄历" in raw or "阴历" in raw):
+            realtime_kind = "calendar_lunar"
+        if not realtime_kind and ("时间" in raw or "日期" in raw or "几点" in raw or "星期" in raw):
+            realtime_kind = "local_datetime"
+        if not realtime_kind and ("票房" in raw or "天气" in raw or "新闻" in raw or "汇率" in raw or "股价" in raw):
+            realtime_kind = "latest_fact"
+        if not confidence:
+            confidence = "medium"
+
+        if not intent and realtime_kind and realtime_kind != "none":
+            intent = "realtime"
+
+        if not intent:
+            return None
+
+        reason = raw.splitlines()[0].strip()[:48] or intent
+        return {
+            "intent": intent,
+            "realtime_kind": realtime_kind or "none",
+            "confidence": confidence,
+            "reason": reason,
+        }
+
+    def _extract_enum_value(self, text: str, candidates) -> Optional[str]:
+        for candidate in candidates:
+            if re.search(rf"\b{re.escape(candidate)}\b", text):
+                return candidate
+        return None
+
+    def _fallback_to_search_when_user_enabled(
+        self,
+        prompt: str,
+        enable_web_search: bool,
+        decision: ChatIntentDecision,
+    ) -> Optional[ChatIntentDecision]:
+        if not enable_web_search or not self.tavily_api_key:
+            return None
+        if decision.reason != "default-general":
+            return None
+        if not self._looks_like_information_query(prompt):
+            return None
+
+        return ChatIntentDecision(
+            intent="realtime",
+            use_rag=False,
+            use_web_search=True,
+            direct_response=None,
+            response_style="realtime",
+            reason="search-toggle-fallback",
+        )
+
+    def _looks_like_information_query(self, prompt: str) -> bool:
+        text = str(prompt or "").strip()
+        if not text:
+            return False
+        lowered = text.lower()
+
+        if any(token in lowered for token in ("写一篇", "写一个", "写个", "润色", "翻译", "总结", "改写", "生成", "代码")):
+            return False
+
+        info_markers = (
+            "谁",
+            "什么",
+            "哪",
+            "哪个",
+            "多少",
+            "几",
+            "多久",
+            "如何",
+            "为什么",
+            "吗",
+            "？",
+            "?",
+            "最近",
+            "最新",
+            "当前",
+            "现任",
+            "现在",
+        )
+        return any(marker in text for marker in info_markers)
+
+    def _build_llm_router_decision(
+        self,
+        *,
+        prompt: str,
+        parsed: Dict[str, str],
+        enable_web_search: bool,
+    ) -> Optional[ChatIntentDecision]:
+        intent = str(parsed.get("intent") or "").strip().lower()
+        realtime_kind = str(parsed.get("realtime_kind") or "none").strip().lower()
+        confidence = str(parsed.get("confidence") or "low").strip().lower()
+        reason = str(parsed.get("reason") or intent or "llm").strip().lower().replace(" ", "-")
+        router_reason = f"llm-router:{reason or 'unknown'}"
+
+        if confidence not in {"high", "medium"}:
+            logger.info(
+                "[Route] llm-refine ignored due to low confidence: intent=%s realtime_kind=%s confidence=%s reason=%s",
+                intent or "unknown",
+                realtime_kind,
+                confidence,
+                router_reason,
+            )
+            return None
+
+        if intent == INTENT_PSYCHOLOGY:
+            return ChatIntentDecision(
+                intent=INTENT_PSYCHOLOGY,
+                use_rag=True,
+                use_web_search=False,
+                direct_response=None,
+                response_style="psychology",
+                reason=router_reason,
+            )
+
+        if intent == INTENT_IDENTITY:
+            return ChatIntentDecision(
+                intent=INTENT_IDENTITY,
+                use_rag=False,
+                use_web_search=False,
+                direct_response=IDENTITY_REPLY,
+                response_style="identity",
+                reason=router_reason,
+            )
+
+        if intent == INTENT_CASUAL:
+            reply = THANKS_REPLY if any(token in prompt for token in ("谢谢", "感谢", "多谢")) else GREETING_REPLY
+            return ChatIntentDecision(
+                intent=INTENT_CASUAL,
+                use_rag=False,
+                use_web_search=False,
+                direct_response=reply,
+                response_style="casual",
+                reason=router_reason,
+            )
+
+        if intent == "realtime" or realtime_kind != "none":
+            return self._build_llm_realtime_decision(
+                prompt=prompt,
+                realtime_kind=realtime_kind,
+                enable_web_search=enable_web_search,
+                reason=router_reason,
+            )
+
+        if intent == INTENT_GENERAL:
+            return ChatIntentDecision(
+                intent=INTENT_GENERAL,
+                use_rag=False,
+                use_web_search=False,
+                direct_response=None,
+                response_style="general",
+                reason=router_reason,
+            )
+
+        return None
+
+    def _build_llm_realtime_decision(
+        self,
+        *,
+        prompt: str,
+        realtime_kind: str,
+        enable_web_search: bool,
+        reason: str,
+    ) -> ChatIntentDecision:
+        search_available = bool(self.tavily_api_key)
+        kind = realtime_kind if realtime_kind in {"local_datetime", "calendar_lunar", "latest_fact"} else "latest_fact"
+
+        if kind == "local_datetime":
+            if enable_web_search and search_available:
+                return ChatIntentDecision(
+                    intent="realtime",
+                    use_rag=False,
+                    use_web_search=True,
+                    direct_response=None,
+                    response_style="realtime",
+                    reason=reason,
+                )
+            return ChatIntentDecision(
+                intent="realtime",
+                use_rag=False,
+                use_web_search=False,
+                direct_response=self._build_datetime_answer(prompt),
+                response_style="realtime",
+                reason=reason,
+            )
+
+        if enable_web_search and search_available:
+            return ChatIntentDecision(
+                intent="realtime",
+                use_rag=False,
+                use_web_search=True,
+                direct_response=None,
+                response_style="realtime",
+                reason=reason,
+            )
+
+        return ChatIntentDecision(
+            intent="realtime",
+            use_rag=False,
+            use_web_search=False,
+            direct_response=REALTIME_UNAVAILABLE if enable_web_search else REALTIME_REFUSAL,
+            response_style="realtime",
+            reason=reason,
+        )
+
     def _is_datetime_query(self, prompt: str) -> bool:
         text = str(prompt or "")
         keywords = ("今天几号", "今天星期几", "星期几", "周几", "几月几号", "日期", "几号", "现在几点", "几点", "当前时间")
+        return any(keyword in text for keyword in keywords)
+
+    def _is_lunar_query(self, prompt: str) -> bool:
+        text = str(prompt or "")
+        keywords = ("农历", "阴历", "黄历", "老黄历")
         return any(keyword in text for keyword in keywords)
 
     def _is_weather_query(self, prompt: str) -> bool:
@@ -143,6 +572,9 @@ class EmoLLMClient:
         for phrase in cleanup_phrases:
             text = text.replace(phrase, "")
         text = text.strip("：:，,。！？? ")
+
+        if self._is_lunar_query(prompt):
+            return "今天 农历 日期 黄历"
 
         if self._is_datetime_query(prompt):
             return "北京时间 当前日期 星期几 现在时间"
@@ -179,6 +611,46 @@ class EmoLLMClient:
             return f"根据当前系统时间（Asia/Shanghai），现在是 {now:%Y-%m-%d %H:%M:%S}，{weekday_text}。"
 
         return f"根据当前系统时间（Asia/Shanghai），今天是 {now:%Y年%m月%d日}，{weekday_text}。"
+
+    def _build_datetime_fallback_after_search(self, prompt: str) -> str:
+        local_answer = self._build_datetime_answer(prompt)
+        return f"联网搜索未返回有效时间结果，以下改用系统时间回答。\n\n{local_answer}"
+
+    def _build_response_meta(
+        self,
+        *,
+        prompt: str,
+        decision: ChatIntentDecision,
+        search_result: str = "",
+        direct_response: Optional[str] = None,
+    ) -> Optional[Dict[str, str]]:
+        is_datetime_query = self._is_datetime_query(prompt) or "local_datetime" in decision.reason
+        is_lunar_query = self._is_lunar_query(prompt) or "calendar_lunar" in decision.reason
+        if decision.intent != "realtime" or not (is_datetime_query or is_lunar_query):
+            return None
+
+        if decision.use_web_search and search_result:
+            return {
+                "badge": "联网日历" if is_lunar_query else "联网时间",
+                "source": "web_search",
+                "detail": "当前回答优先依据联网搜索结果。",
+            }
+
+        if is_datetime_query and decision.use_web_search and direct_response:
+            return {
+                "badge": "本地时间",
+                "source": "system_time_fallback",
+                "detail": "联网搜索失败，已回退为系统时间。",
+            }
+
+        if is_lunar_query:
+            return None
+
+        return {
+            "badge": "本地时间",
+            "source": "system_time",
+            "detail": "当前回答依据系统时间。",
+        }
 
     def _perform_web_search(self, prompt: str, max_results: int = 3) -> str:
         search_query = self._normalize_web_search_query(prompt)
@@ -255,9 +727,8 @@ class EmoLLMClient:
             )
         elif decision.intent == "realtime":
             system_prompt = (
-                "你是一个信息整理助手。你只能依据我提供的【最新联网搜索结果】回答。"
-                "如果搜索结果不足以支撑结论，请明确说信息不足。"
-                "如果额外提供了【系统时间（Asia/Shanghai）】，且用户询问日期、星期或当前时间，请优先依据该信息回答。"
+                "你是一个信息整理助手。优先依据我提供的【最新联网搜索结果】回答。"
+                "如果搜索结果不足以支撑结论，再结合我额外提供的【系统时间（Asia/Shanghai）】作为补充或回退。"
                 "不要依赖过时记忆，不要补充心理建议。请用中文简洁作答。"
             )
         else:
@@ -285,13 +756,18 @@ class EmoLLMClient:
         rag_text: str = "",
         search_result: str = "",
         realtime_context: str = "",
+        assessment_context: str = "",
     ) -> str:
         """Build the final user prompt according to the selected route."""
         base = str(prompt or "").strip()
+        assessment_block = ""
+        if assessment_context and decision.intent in (INTENT_PSYCHOLOGY, INTENT_GENERAL):
+            assessment_block = f"【最近评估背景】\n{assessment_context.strip()}\n\n"
 
         if decision.intent == INTENT_PSYCHOLOGY:
             if rag_text:
                 return (
+                    assessment_block +
                     f"【专业知识库】\n{rag_text}\n\n"
                     f"【用户提问】\n{base}\n\n"
                     "请先直接回答用户当前最核心的问题，再在必要时补充专业解释。"
@@ -300,6 +776,7 @@ class EmoLLMClient:
                     "除非用户明确要求列表或量表条目，否则不要堆砌长列表。"
                 )
             return (
+                assessment_block +
                 f"【用户提问】\n{base}\n\n"
                 "请先共情，再直接回应当前问题。不要输出无关的心理学名词解释。"
                 "如果用户在问明确的量表、术语或缩写，回答开头首次出现该名词时请用 Markdown 加粗。"
@@ -314,10 +791,11 @@ class EmoLLMClient:
             return (
                 "\n\n".join(context_parts)
                 + "\n\n"
-                "请严格基于上面的最新搜索结果作答；如果搜索结果不足以支持结论，请明确说明信息不足。"
+                "请优先基于上面的最新搜索结果作答；如果搜索结果不足以支持结论，且提供了系统时间，可以明确说明后将系统时间作为补充。"
             )
 
         return (
+            assessment_block +
             f"【用户问题】\n{base}\n\n"
             "请直接、简洁、准确回答。除非用户明确询问心理学，否则不要扩展为心理学名词解释、量表说明或泛泛的心理建议。"
         )
@@ -328,13 +806,18 @@ class EmoLLMClient:
         prompt: str,
         history: Optional[List[Tuple[str, str]]],
         emotion_context: Optional[Dict],
+        assessment_context: Optional[str],
         enable_web_search: bool,
         decision: Optional[ChatIntentDecision] = None,
         search_result_override: Optional[str] = None,
     ) -> Dict:
         """Prepare routed prompts, RAG, and optional search results for a chat request."""
         history = history or []
-        decision = decision or self._classify_intent(prompt, enable_web_search)
+        decision = decision or self._decide_route(
+            prompt,
+            enable_web_search=enable_web_search,
+            assessment_context=assessment_context,
+        )
 
         if decision.direct_response:
             return {
@@ -357,7 +840,7 @@ class EmoLLMClient:
             if not search_result:
                 direct_response = None
                 if decision.intent == "realtime" and self._is_datetime_query(prompt):
-                    direct_response = self._build_datetime_answer(prompt)
+                    direct_response = self._build_datetime_fallback_after_search(prompt)
                 return {
                     "decision": decision,
                     "history": history,
@@ -369,15 +852,18 @@ class EmoLLMClient:
                 }
 
         if decision.intent == "realtime" and self._is_datetime_query(prompt):
-            return {
-                "decision": decision,
-                "history": history,
-                "direct_response": self._build_datetime_answer(prompt),
-                "messages": [],
-                "retrieval_content": [],
-                "search_result": search_result,
-                "final_prompt": prompt,
-            }
+            if decision.use_web_search and search_result:
+                logger.info("[Route] realtime datetime will prefer web search over system time")
+            else:
+                return {
+                    "decision": decision,
+                    "history": history,
+                    "direct_response": self._build_datetime_answer(prompt),
+                    "messages": [],
+                    "retrieval_content": [],
+                    "search_result": search_result,
+                    "final_prompt": prompt,
+                }
 
         routed_prompt = (
             self._enhance_prompt_with_emotion(prompt, emotion_context)
@@ -386,7 +872,9 @@ class EmoLLMClient:
         )
         retrieval_content = self._rag_retrieve(prompt) if decision.use_rag else []
         rag_text = self._format_retrieval_content(retrieval_content) if retrieval_content else ""
-        realtime_context = self._build_realtime_context(prompt)
+        realtime_context = ""
+        if not (decision.intent == "realtime" and decision.use_web_search and search_result):
+            realtime_context = self._build_realtime_context(prompt)
 
         system_prompt = self._build_system_prompt_for_intent(decision, emotion_context)
         final_prompt = self._build_user_prompt_for_intent(
@@ -395,6 +883,7 @@ class EmoLLMClient:
             rag_text=rag_text,
             search_result=search_result,
             realtime_context=realtime_context,
+            assessment_context=assessment_context or "",
         )
 
         messages = [{"role": "system", "content": system_prompt}]
@@ -421,6 +910,7 @@ class EmoLLMClient:
              top_p: float = 0.8,
              temperature: float = 0.7,
              emotion_context: Optional[Dict] = None,
+             assessment_context: Optional[str] = None,
              enable_web_search: bool = False,
              timeout: Optional[int] = None) -> Tuple[str, List]:
         """
@@ -443,11 +933,18 @@ class EmoLLMClient:
             prompt=prompt,
             history=history,
             emotion_context=emotion_context,
+            assessment_context=assessment_context,
             enable_web_search=enable_web_search,
         )
         history = prepared["history"]
         decision = prepared["decision"]
         retrieval_content = prepared["retrieval_content"]
+        response_meta = self._build_response_meta(
+            prompt=prompt,
+            decision=decision,
+            search_result=prepared.get("search_result", ""),
+            direct_response=prepared.get("direct_response"),
+        )
 
         if prepared["direct_response"]:
             ai_response = self._postprocess_response(prompt, decision, prepared["direct_response"])
@@ -491,7 +988,7 @@ class EmoLLMClient:
             try:
                 start_time = time.time()
                 
-                response = self.session.post(
+                response = self._post(
                     self.api_url,
                     json=request_data,
                     timeout=request_timeout
@@ -567,17 +1064,30 @@ class EmoLLMClient:
                     top_p: float = 0.8,
                     temperature: float = 0.7,
                     emotion_context: Optional[Dict] = None,
+                    assessment_context: Optional[str] = None,
                     enable_web_search: bool = False,
                     timeout: Optional[int] = None):
         """流式心理咨询对话（带意图分流与按需 RAG/联网搜索）"""
 
-        decision = self._classify_intent(prompt, enable_web_search)
+        decision = self._decide_route(
+            prompt,
+            enable_web_search=enable_web_search,
+            assessment_context=assessment_context,
+        )
         history = history or []
         search_result = None
 
         if decision.direct_response:
             logger.info("[Route] direct stream response intent=%s", decision.intent)
             direct_response = self._postprocess_response(prompt, decision, decision.direct_response)
+            response_meta = self._build_response_meta(
+                prompt=prompt,
+                decision=decision,
+                search_result="",
+                direct_response=decision.direct_response,
+            )
+            if response_meta:
+                yield {"meta": response_meta}
             for piece in self._iter_local_response_chunks(direct_response):
                 yield piece
             return
@@ -606,6 +1116,7 @@ class EmoLLMClient:
             prompt=prompt,
             history=history,
             emotion_context=emotion_context,
+            assessment_context=assessment_context,
             enable_web_search=enable_web_search,
             decision=decision,
             search_result_override=search_result,
@@ -613,15 +1124,25 @@ class EmoLLMClient:
         history = prepared["history"]
         decision = prepared["decision"]
         retrieval_content = prepared["retrieval_content"]
+        response_meta = self._build_response_meta(
+            prompt=prompt,
+            decision=decision,
+            search_result=prepared.get("search_result", ""),
+            direct_response=prepared.get("direct_response"),
+        )
 
         if prepared["direct_response"]:
             logger.info("[Route] direct stream response intent=%s", decision.intent)
             direct_response = self._postprocess_response(prompt, decision, prepared["direct_response"])
+            if response_meta:
+                yield {"meta": response_meta}
             for piece in self._iter_local_response_chunks(direct_response):
                 yield piece
             return
 
         messages = prepared["messages"]
+        if response_meta:
+            yield {"meta": response_meta}
 
         # 3. 发起请求
         default_max = int(os.getenv("LLM_MAX_TOKENS_DEFAULT", "1200"))
@@ -648,7 +1169,7 @@ class EmoLLMClient:
         request_timeout = timeout if timeout is not None else max(self.timeout, 120)
         
         try:
-            response = self.session.post(
+            response = self._post(
                 self.api_url,
                 json=request_data,
                 timeout=(10, request_timeout),
@@ -746,7 +1267,7 @@ class EmoLLMClient:
                 self.rag_select_num,
                 len(query),
             )
-            r = requests.post(
+            r = self._post(
                 self.rag_api_url,
                 json={
                     "query": query,
@@ -790,14 +1311,31 @@ class EmoLLMClient:
                 "include_answer": True,
                 "include_raw_content": False
             }
-            
-            response = self.session.post(
-                self.tavily_api_url,
-                json=search_data,
-                timeout=(5, 15)  # (connect_timeout, read_timeout)
-            )
-            response.raise_for_status()
-            data = response.json()
+
+            try:
+                data = self._request_tavily(
+                    search_data,
+                    self._session_for_url(self.tavily_api_url),
+                )
+            except requests.exceptions.ProxyError as e:
+                logger.warning(
+                    "Tavily搜索命中代理错误，改为直连重试: %s",
+                    str(e),
+                )
+                data = self._request_tavily(
+                    search_data,
+                    self.direct_session,
+                )
+            except requests.exceptions.Timeout as e:
+                logger.warning(
+                    "Tavily搜索首轮超时，等待后改为直连重试: %s",
+                    str(e),
+                )
+                time.sleep(1)
+                data = self._request_tavily(
+                    search_data,
+                    self.direct_session,
+                )
             
             results = []
             
@@ -831,7 +1369,14 @@ class EmoLLMClient:
                 return ""
                 
         except requests.exceptions.Timeout as e:
-            logger.warning(f"Tavily搜索超时: {query[:50]}... (错误: {str(e)})")
+            connect_timeout, read_timeout = self._tavily_timeouts()
+            logger.warning(
+                "Tavily搜索超时: %s... (connect_timeout=%s, read_timeout=%s, 错误: %s)",
+                query[:50],
+                connect_timeout,
+                read_timeout,
+                str(e),
+            )
             return ""
         except requests.exceptions.RequestException as e:
             logger.warning(f"Tavily搜索请求失败: {query[:50]}... (错误: {str(e)})")
@@ -941,7 +1486,7 @@ class EmoLLMClient:
                 ],
                 "max_tokens": 10
             }
-            response = self.session.post(
+            response = self._post(
                 self.api_url,
                 json=test_data,
                 timeout=5
@@ -954,6 +1499,8 @@ class EmoLLMClient:
     def close(self):
         """关闭客户端会话"""
         self.session.close()
+        self.local_session.close()
+        self.direct_session.close()
         logger.info("心理咨询客户端已关闭")
 
 

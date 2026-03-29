@@ -4,6 +4,7 @@ import datetime
 import json
 import logging
 from datetime import timezone, timedelta
+from new_features.scale_assessment.repository import list_scale_records
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,47 @@ def calculate_total_time(records):
         days = total_seconds // 86400
         hours = (total_seconds % 86400) // 3600
         return f"{days} 天"
+
+
+def normalize_datetime(dt_value):
+    parsed = parse_datetime(dt_value)
+    if parsed and getattr(parsed, "tzinfo", None) is not None:
+        return parsed.astimezone().replace(tzinfo=None)
+    return parsed
+
+
+def format_history_time(dt_value):
+    if not dt_value:
+        return "未完成"
+
+    try:
+        return normalize_datetime(dt_value).strftime('%Y-%m-%d %H:%M')
+    except Exception:
+        return str(dt_value)
+
+
+def format_duration_brief(seconds):
+    total_seconds = int(seconds or 0)
+    if total_seconds <= 0:
+        return "未记录"
+    if total_seconds < 60:
+        return f"{total_seconds}秒"
+    if total_seconds < 3600:
+        return f"{(total_seconds + 59) // 60}分钟"
+    if total_seconds < 86400:
+        return f"{(total_seconds + 3599) // 3600}小时"
+    return f"{(total_seconds + 86399) // 86400}天"
+
+
+def resolve_status_level(label):
+    text = str(label or "")
+    if any(token in text for token in ("无", "正常", "最轻", "轻微")):
+        return "good"
+    if "轻" in text:
+        return "mild"
+    if "中" in text:
+        return "moderate"
+    return "high"
 
 @mi.route('/main', methods=["GET"])
 def main():
@@ -195,7 +237,9 @@ def history():
     userinfo = session.get("userinfo")
 
     role = userinfo['role']
-    if role == 2:
+    is_admin = str(role) == "2"
+
+    if is_admin:
         test_list = db.fetch_all("select * from test", [])
     else:
         test_list = db.fetch_all("select * from test where user_id=?", [userinfo['id']])
@@ -206,25 +250,78 @@ def history():
     # 按 id 降序排序（id 越大越新，最可靠）
     sorted_list = sorted(filtered_list, key=lambda x: x['id'], reverse=True)
 
-    if len(sorted_list) == 0:
+    history_records = []
+    for item in sorted_list:
+        finished_at = normalize_datetime(item.get('finish_time'))
+        item['finish_time'] = format_history_time(item.get('finish_time'))
+        history_records.append({
+            'id': item['id'],
+            'record_kind': 'sds',
+            'record_name': 'SDS 抑郁自评量表',
+            'record_code': 'SDS',
+            'score': item.get('score') or 0,
+            'result_label': item.get('result') or '未知',
+            'status_level': resolve_status_level(item.get('result')),
+            'finish_time': item['finish_time'],
+            'use_time': int(item.get('use_time') or 0),
+            'use_time_display': format_duration_brief(item.get('use_time')),
+            'risk_text': '',
+            'summary': '',
+            'sort_time': finished_at or datetime.datetime.min,
+        })
+
+    scale_rows = list_scale_records(
+        user_id=None if is_admin else userinfo['id'],
+        limit=100,
+    )
+    for record in scale_rows:
+        completed_at = record.get('completed_at') or record.get('created_at')
+        risk_text = "；".join(
+            flag.get('label')
+            for flag in record.get('risk_flags', [])
+            if isinstance(flag, dict) and flag.get('label')
+        )
+        history_records.append({
+            'id': record['id'],
+            'record_kind': 'scale',
+            'record_name': record.get('scale_name') or record.get('scale_code') or '量表筛查',
+            'record_code': record.get('scale_code') or '量表',
+            'score': record.get('total_score') or 0,
+            'result_label': record.get('severity_label') or '未知',
+            'status_level': resolve_status_level(record.get('severity_label')),
+            'finish_time': format_history_time(completed_at),
+            'use_time': int(record.get('use_time') or 0),
+            'use_time_display': format_duration_brief(record.get('use_time')),
+            'risk_text': risk_text,
+            'summary': record.get('summary') or '',
+            'sort_time': normalize_datetime(completed_at) or datetime.datetime.min,
+        })
+
+    history_records.sort(key=lambda row: row['sort_time'], reverse=True)
+
+    if len(history_records) == 0:
         status = "未测评"
         all_times = 0
         delta = 0
         total_time_str = "0 分钟"
     else:
-        all_times = len(sorted_list)
-        status = sorted_list[0]["result"]
-        latest_time = parse_datetime(sorted_list[0]['finish_time'])
+        all_times = len(history_records)
+        status = history_records[0]["result_label"]
+        latest_time = history_records[0]['sort_time']
         current_time = get_beijing_time()
-        delta = (current_time - latest_time).days if (current_time - latest_time).days >= 0 else 0
-        # 计算并打印总时间
-        total_time_str = calculate_total_time(sorted_list)
+        delta = (current_time - latest_time).days if latest_time and (current_time - latest_time).days >= 0 else 0
+        total_time_str = calculate_total_time(history_records)
 
-        for item in sorted_list:
-            item['finish_time'] = parse_datetime(item['finish_time']).strftime('%Y-%m-%d %H:%M')
-
-    response = make_response(render_template("history.html", sorted_list = sorted_list, user_name = userinfo['name'],
-                           all_times=all_times, status=status, delta=delta, total_time_str=total_time_str))
+    response = make_response(render_template(
+        "history.html",
+        sorted_list=sorted_list,
+        history_records=history_records,
+        user_name=userinfo['name'],
+        all_times=all_times,
+        status=status,
+        delta=delta,
+        total_time_str=total_time_str,
+    ))
     
     # 防止浏览器缓存
     response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'

@@ -68,6 +68,25 @@ REALTIME_KEYWORDS = (
     "热搜",
     "比分",
 )
+DATETIME_KEYWORDS = (
+    "今天几号",
+    "今天星期几",
+    "今天日期",
+    "几号",
+    "星期",
+    "日期",
+    "时间",
+    "几点",
+    "当前时间",
+    "周几",
+    "几月几号",
+)
+LUNAR_KEYWORDS = (
+    "农历",
+    "阴历",
+    "黄历",
+    "老黄历",
+)
 PSYCHOLOGY_KEYWORDS = (
     "抑郁",
     "焦虑",
@@ -115,6 +134,46 @@ def classify_chat_intent(
 ) -> ChatIntentDecision:
     """Classify the current request into a small set of chat intents."""
     normalized = _normalize(message)
+
+    if _contains_any(normalized, LUNAR_KEYWORDS):
+        if enable_web_search and search_available:
+            return ChatIntentDecision(
+                intent=INTENT_REALTIME,
+                use_rag=False,
+                use_web_search=True,
+                direct_response=None,
+                response_style="realtime",
+                reason="lunar-with-search",
+            )
+
+        return ChatIntentDecision(
+            intent=INTENT_REALTIME,
+            use_rag=False,
+            use_web_search=False,
+            direct_response=REALTIME_UNAVAILABLE if enable_web_search else REALTIME_REFUSAL,
+            response_style="realtime",
+            reason="lunar-without-search",
+        )
+
+    if _contains_any(normalized, DATETIME_KEYWORDS):
+        if enable_web_search and search_available:
+            return ChatIntentDecision(
+                intent=INTENT_REALTIME,
+                use_rag=False,
+                use_web_search=True,
+                direct_response=None,
+                response_style="realtime",
+                reason="datetime-with-search",
+            )
+
+        return ChatIntentDecision(
+            intent=INTENT_REALTIME,
+            use_rag=False,
+            use_web_search=False,
+            direct_response=None,
+            response_style="realtime",
+            reason="datetime-local-fallback",
+        )
 
     if _contains_any(normalized, REALTIME_KEYWORDS):
         if enable_web_search and search_available:

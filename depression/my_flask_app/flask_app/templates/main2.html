@@ -123,9 +123,12 @@
                     </div>
                     
                     <div class="flex flex-wrap gap-4">
-                        <a href="{{ url_for('test.SDS') }}" class="flex items-center gap-2 px-8 py-3.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 group/btn active:scale-95">
-                            <span class="font-semibold text-[15px]">开始新测评</span>
+                        <a href="{{ url_for('scale_assessment.scale_home') }}" class="flex items-center gap-2 px-8 py-3.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 group/btn active:scale-95">
+                            <span class="font-semibold text-[15px]">开始量表筛查</span>
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 group-hover/btn:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                        </a>
+                        <a href="{{ url_for('test.SDS') }}" class="px-8 py-3.5 bg-white/80 text-slate-600 border border-slate-200 rounded-xl hover:bg-white hover:text-slate-900 transition-all font-semibold text-[15px] active:scale-95 shadow-sm">
+                            SDS 旧版测评
                         </a>
                         <a href="{{ url_for('main.history') }}" class="px-8 py-3.5 bg-white/80 text-slate-600 border border-slate-200 rounded-xl hover:bg-white hover:text-slate-900 transition-all font-semibold text-[15px] active:scale-95 shadow-sm">
                             查看历史记录

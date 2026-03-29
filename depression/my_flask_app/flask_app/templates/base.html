@@ -172,9 +172,14 @@
 
             <div class="pt-4 pb-2 px-4 text-xs font-semibold text-textTertiary uppercase tracking-wide">测评服务</div>
 
+            <a href="{{ url_for('scale_assessment.scale_home') }}" class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-btn transition-all group {% if 'scale_assessment' in request.endpoint %}bg-[#165DFF]/10 text-[#165DFF]{% else %}text-textSecondary hover:bg-gray-50{% endif %}">
+                <i class="fa-solid fa-notes-medical w-5 text-center {% if 'scale_assessment' in request.endpoint %}text-[#165DFF]{% else %}text-textTertiary group-hover:text-[#165DFF]{% endif %}"></i>
+                量表筛查
+            </a>
+
             <a href="{{ url_for('test.SDS') }}" class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-btn transition-all group {% if 'SDS' in request.endpoint %}bg-[#165DFF]/10 text-[#165DFF]{% else %}text-textSecondary hover:bg-gray-50{% endif %}">
                 <i class="fa-solid fa-clipboard-list w-5 text-center {% if 'SDS' in request.endpoint %}text-[#165DFF]{% else %}text-textTertiary group-hover:text-[#165DFF]{% endif %}"></i>
-                开始测评
+                SDS 旧版测评
             </a>
 
             <a href="{{ url_for('psychological_counseling.counseling_page') }}" class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-btn transition-all group {% if 'counseling' in request.endpoint %}bg-[#165DFF]/10 text-[#165DFF]{% else %}text-textSecondary hover:bg-gray-50{% endif %}">

@@ -12,6 +12,10 @@ LLM_START_TIMEOUT="${LLM_START_TIMEOUT:-180}"
 LLM_MODEL_PATH="${LLM_MODEL_PATH:-${ROOT_DIR}/../EmoLLM/model/EmoLLM_Qwen2-7B-Instruct_lora}"
 LLM_SERVED_MODEL="${LLM_SERVED_MODEL:-${SILICONFLOW_MODEL:-emollm-qwen2-7b}}"
 LLM_HEALTH_AUTH_KEY="${LLM_HEALTH_AUTH_KEY:-${SILICONFLOW_API_KEY:-}}"
+LLM_DTYPE="${LLM_DTYPE:-auto}"
+LLM_MAX_MODEL_LEN="${LLM_MAX_MODEL_LEN:-2048}"
+LLM_GPU_MEMORY_UTILIZATION="${LLM_GPU_MEMORY_UTILIZATION:-0.60}"
+LLM_MAX_NUM_SEQS="${LLM_MAX_NUM_SEQS:-2}"
 
 llm_health_code() {
   if [[ -n "${LLM_HEALTH_AUTH_KEY}" ]]; then
@@ -85,11 +89,13 @@ if llm_health_ok; then
   exit 0
 fi
 
+log "INFO" "LLM low-memory profile: dtype=${LLM_DTYPE}, max_model_len=${LLM_MAX_MODEL_LEN}, gpu_memory_utilization=${LLM_GPU_MEMORY_UTILIZATION}, max_num_seqs=${LLM_MAX_NUM_SEQS}"
+
 if [[ -z "${LLM_START_CMD:-}" ]]; then
   if command -v vllm >/dev/null 2>&1; then
-    LLM_START_CMD="vllm serve \"${LLM_MODEL_PATH}\" --host 127.0.0.1 --port 8000 --served-model-name \"${LLM_SERVED_MODEL}\" --dtype auto --max-model-len 4096 --gpu-memory-utilization 0.90"
+    LLM_START_CMD="vllm serve \"${LLM_MODEL_PATH}\" --host 127.0.0.1 --port 8000 --served-model-name \"${LLM_SERVED_MODEL}\" --dtype \"${LLM_DTYPE}\" --max-model-len \"${LLM_MAX_MODEL_LEN}\" --gpu-memory-utilization \"${LLM_GPU_MEMORY_UTILIZATION}\" --max-num-seqs \"${LLM_MAX_NUM_SEQS}\""
   elif command -v python3 >/dev/null 2>&1; then
-    LLM_START_CMD="python3 -m vllm.entrypoints.openai.api_server --host 127.0.0.1 --port 8000 --model \"${LLM_MODEL_PATH}\" --served-model-name \"${LLM_SERVED_MODEL}\" --dtype auto --max-model-len 4096 --gpu-memory-utilization 0.90"
+    LLM_START_CMD="python3 -m vllm.entrypoints.openai.api_server --host 127.0.0.1 --port 8000 --model \"${LLM_MODEL_PATH}\" --served-model-name \"${LLM_SERVED_MODEL}\" --dtype \"${LLM_DTYPE}\" --max-model-len \"${LLM_MAX_MODEL_LEN}\" --gpu-memory-utilization \"${LLM_GPU_MEMORY_UTILIZATION}\" --max-num-seqs \"${LLM_MAX_NUM_SEQS}\""
   else
     log "ERR" "No python3/vllm found. Please set LLM_START_CMD in .env"
     exit 1

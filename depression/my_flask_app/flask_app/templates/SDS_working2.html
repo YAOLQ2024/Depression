@@ -823,13 +823,8 @@ document.addEventListener('alpine:init', () => {
                         for (let i = 0; i < 3; i++) {
                             const channelKey = `channel${i + 1}`;
                             if (data.data[channelKey] && data.data[channelKey].waveform) {
-                                const newPoints = data.data[channelKey].waveform.slice(-10); // 取最后10个点
-                                waveforms[i].push(...newPoints);
-                                // 保持最大点数
-                                if (waveforms[i].length > maxPoints) {
-                                    waveforms[i] = waveforms[i].slice(-maxPoints);
-                                }
-                                
+                                // 直接使用后端最新窗口，避免轮询时重复追加同一批点。
+                                waveforms[i] = data.data[channelKey].waveform.slice(-maxPoints);
                             }
                         }
                     }

@@ -57,7 +57,7 @@
                 
                 if (batch && batch.length > 0) {
                     batch.forEach(item => {
-                        if (item.type === 'raw') {
+                        if (item.type === 'raw' && item.channel === 1) {
                             dataBuffer.push(item.value);
                             if (dataBuffer.length > 500) dataBuffer.shift();
                         }

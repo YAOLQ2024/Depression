@@ -454,10 +454,21 @@
                      :class="msg.role === 'user' ? 'bg-blue-500' : 'bg-teal-500'">
                     <i class="fa-solid text-sm" :class="msg.role === 'user' ? 'fa-user' : 'fa-robot'"></i>
                 </div>
-                <div class="flex-1" :class="msg.role === 'user' ? 'flex justify-end' : ''">
+                <div class="flex flex-1 flex-col" :class="msg.role === 'user' ? 'items-end' : 'items-start'">
+                    <div class="mb-1 flex items-center gap-2" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+                        <span class="text-xs text-slate-400" x-text="msg.role === 'user' ? '我' : 'AI 助手'"></span>
+                        <template x-if="msg.role === 'assistant' && msg.meta && msg.meta.badge">
+                            <span
+                                class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                                :class="messageBadgeClass(msg.meta)"
+                                :title="msg.meta.detail || ''"
+                                x-text="msg.meta.badge"
+                            ></span>
+                        </template>
+                    </div>
                     <div class="rounded-2xl px-4 py-3 shadow-sm inline-block"
                          :class="msg.role === 'user' ? 'bg-blue-500 text-white rounded-tr-sm' : 'bg-white text-slate-700 border border-slate-200 rounded-tl-sm'"
-                         :style="msg.role === 'user' ? 'max-width: min(85%, ' + Math.min(Math.max(msg.content.length * 0.5, 4), 20) + 'rem)' : 'max-width: 85%'">
+                         style="max-width: 85%;">
                         <span class="markdown-body text-sm leading-relaxed break-words" x-show="msg.content" x-html="formatMessage(msg.content)"></span>
                         <div x-show="!msg.content && idx === streamingIndex && loading" class="flex items-center gap-2">
                             <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0s"></span>
@@ -605,9 +616,7 @@ document.addEventListener('alpine:init', () => {
         userInput: '',
         loading: false,
         recordId: recordId,
-        reportData: null,
         hasAnalyzed: false,  // 标记是否已经分析过报告
-        isLoadingReport: false,
         includeReport: false,  // 复选框状态
         webSearchEnabled: false,  // 联网搜索开关
         streamingMessage: '',  // 正在流式输出的消息内容
@@ -661,94 +670,8 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
-        async loadReportData() {
-            // 加载报告数据
-            if (this.isLoadingReport || this.reportData) return;
-            
-            if (!this.recordId) {
-                console.error('缺少record_id');
-                return;
-            }
-
-            this.isLoadingReport = true;
-            try {
-                const response = await fetch(`/api/report-details/${this.recordId}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.status === 'success') {
-                        this.reportData = data.data;
-                    }
-                }
-            } catch (error) {
-                console.error('加载报告数据失败:', error);
-            } finally {
-                this.isLoadingReport = false;
-            }
-        },
-
         toggleChat() {
             this.showChat = !this.showChat;
-            if (this.showChat) {
-                // 打开弹窗时加载报告数据
-                this.loadReportData();
-            }
-        },
-
-
-        buildAnalysisPrompt() {
-            // 构建包含报告数据的提示词（优化版本，减少长度）
-            if (!this.reportData) return '';
-            
-            let prompt = '请分析以下测评报告数据：\n\n';
-            
-            // 基本信息（简化）
-            prompt += `【基本信息】SDS标准分: ${this.reportData.score}, 抑郁程度: ${this.reportData.result}`;
-            if (this.reportData.comprehensive_score) {
-                prompt += `, 综合评分: ${this.reportData.comprehensive_score}`;
-            }
-            prompt += `, 完成时间: ${this.reportData.finish_time}\n\n`;
-            
-            // 综合评分结果（简化，只保留关键信息）
-            if (this.reportData.comprehensive_result) {
-                const comp = this.reportData.comprehensive_result;
-                prompt += `【综合评分】`;
-                if (comp.depression_level) prompt += ` 抑郁等级: ${comp.depression_level}`;
-                if (comp.comprehensive_score) prompt += ` 综合分: ${comp.comprehensive_score}`;
-                if (comp.sds_score) prompt += ` SDS分: ${comp.sds_score}`;
-                prompt += '\n\n';
-            }
-            
-            // 表情数据（简化，只保留摘要）
-            if (this.reportData.emotion_data) {
-                const emotion = this.reportData.emotion_data;
-                if (emotion.summary) {
-                    prompt += `【表情识别】${JSON.stringify(emotion.summary)}\n\n`;
-                } else {
-                    // 只保留关键字段
-                    const simplified = {};
-                    if (emotion.dominant_emotion) simplified.dominant_emotion = emotion.dominant_emotion;
-                    if (emotion.total_detections) simplified.total_detections = emotion.total_detections;
-                    if (Object.keys(simplified).length > 0) {
-                        prompt += `【表情识别】${JSON.stringify(simplified)}\n\n`;
-                    }
-                }
-            }
-            
-            // 答题详情（只保留高分题目）
-            if (this.reportData.details && this.reportData.details.length > 0) {
-                const highScoreItems = this.reportData.details.filter(item => item.score >= 3);
-                if (highScoreItems.length > 0) {
-                    prompt += `【高分题目】`;
-                    highScoreItems.forEach(item => {
-                        prompt += ` ${item.question_id}(${item.score}分)`;
-                    });
-                    prompt += '\n\n';
-                }
-            }
-            
-            prompt += '请基于以上数据，提供详细的分析和建议。';
-            
-            return prompt;
         },
 
         formatMessage(content) {
@@ -764,6 +687,13 @@ document.addEventListener('alpine:init', () => {
                 console.error('Markdown解析失败:', e);
                 return cleanContent; // 降级处理：直接显示原文
             }
+        },
+
+        messageBadgeClass(meta) {
+            if (!meta || !meta.source) return 'bg-slate-100 text-slate-600 border border-slate-200';
+            if (meta.source === 'web_search') return 'bg-blue-50 text-blue-600 border border-blue-100';
+            if (meta.source === 'system_time_fallback') return 'bg-amber-50 text-amber-700 border border-amber-100';
+            return 'bg-slate-100 text-slate-600 border border-slate-200';
         },
 
         handleKeydown(event) {
@@ -792,28 +722,18 @@ document.addEventListener('alpine:init', () => {
             this.loading = true;
             this.streamingMessage = '';
             this.streamingIndex = this.messages.length;  // 新消息的索引
-            this.messages.push({ role: 'assistant', content: '' });  // 占位消息
+            this.messages.push({ role: 'assistant', content: '', meta: null });  // 占位消息
             this.isStreaming = true;
             this.scrollToBottom();
 
             try {
-                // 检查是否需要包含报告数据
-                let actualMessage = content;
-                if (this.includeReport && !this.hasAnalyzed) {
-                    // 确保报告数据已加载
-                    if (!this.reportData) {
-                        await this.loadReportData();
-                    }
-                    // 构建包含报告数据的提示词
-                    const analysisPrompt = this.buildAnalysisPrompt();
-                    if (analysisPrompt) {
-                        // 将用户消息和报告数据组合
-                        actualMessage = `${analysisPrompt}\n\n用户问题：${content}`;
-                        this.hasAnalyzed = true;  // 标记已分析，避免重复触发
-                        this.includeReport = false;  // 重置复选框
-                        // 保存状态
-                        this.saveMessages();
-                    }
+                // 报告详情页固定绑定当前记录，由后端统一构建评估背景
+                let includeReport = false;
+                if (this.includeReport && !this.hasAnalyzed && this.recordId) {
+                    includeReport = true;
+                    this.hasAnalyzed = true;  // 标记已分析，避免重复触发
+                    this.includeReport = false;  // 重置复选框
+                    this.saveMessages();
                 }
 
                 // 构建历史记录（格式：[(用户消息, AI回复), ...]）
@@ -829,7 +749,9 @@ document.addEventListener('alpine:init', () => {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
-                        message: actualMessage,
+                        message: content,
+                        include_report: includeReport,
+                        report_record_id: includeReport ? this.recordId : undefined,
                         include_emotion: false,
                         web_search: this.webSearchEnabled,  // 发送搜索开关状态
                         history: history,
@@ -866,6 +788,11 @@ document.addEventListener('alpine:init', () => {
                                     }
                                     this.messages[this.streamingIndex].content = data.status;
                                     this.scrollToBottom();
+                                    continue;
+                                }
+                                if (data.meta) {
+                                    this.messages[this.streamingIndex].meta = data.meta;
+                                    this.saveMessages();
                                     continue;
                                 }
                                 if (data.status_clear) {
@@ -924,6 +851,7 @@ document.addEventListener('alpine:init', () => {
                 } else {
                     this.messages.push({ 
                         role: 'assistant', 
+                        meta: null,
                         content: "系统暂时繁忙，请稍后再试。错误：" + (error.message || '未知错误') 
                     });
                 }
