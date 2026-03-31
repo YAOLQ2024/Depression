@@ -87,6 +87,7 @@ class ONNXGPUEmotionRecognitionService:
         self.emotion_stats = {label.lower(): 0 for label in self.emotion_labels}
         self.total_detections = 0
         self._last_emotion = None  # 跟踪上次检测到的表情，用于只在变化时打印
+        self._last_log_time = 0.0  # 节流控制台日志，避免和前端状态刷新节奏脱节
         
         # 使用GPU模式
         self.use_gpu = GPU_AVAILABLE
@@ -595,11 +596,13 @@ class ONNXGPUEmotionRecognitionService:
             if annotated_image:
                 result['annotated_image'] = annotated_image
             
-            # 只在表情变化时打印
-            if self._last_emotion != dominant_emotion:
+            # 表情变化时立即打印，稳定状态下也定期打印一次，便于排查前后端节奏是否一致
+            now = time.monotonic()
+            if self._last_emotion != dominant_emotion or (now - self._last_log_time) >= 5:
                 emotion_text = self.emotion_chinese.get(dominant_emotion, dominant_emotion)
-                print(f"[表情检测] {emotion_text} ({dominant_confidence:.1%})")
+                print(f"[表情检测] {emotion_text} ({dominant_confidence:.1%}) 人脸:{len(detections)}")
                 self._last_emotion = dominant_emotion
+                self._last_log_time = now
             
             self.logger.debug(f"检测完成: {len(detections)}个人脸, {len(all_emotions)}个表情, 主要表情: {dominant_emotion}")
             return result

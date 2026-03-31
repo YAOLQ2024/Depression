@@ -43,6 +43,7 @@ def init_database():
             start_time DATETIME,
             finish_time DATETIME,
             use_time INTEGER,
+            progress_index INTEGER DEFAULT 0,
             status VARCHAR(25),
             result VARCHAR(10),
             emotion_data TEXT,
@@ -144,6 +145,14 @@ def migrate_database():
     except sqlite3.OperationalError:
         print("添加comprehensive_result列到test表...")
         cursor.execute("ALTER TABLE test ADD COLUMN comprehensive_result TEXT")
+        conn.commit()
+
+    # 检查并添加progress_index列
+    try:
+        cursor.execute("SELECT progress_index FROM test LIMIT 1")
+    except sqlite3.OperationalError:
+        print("添加progress_index列到test表...")
+        cursor.execute("ALTER TABLE test ADD COLUMN progress_index INTEGER DEFAULT 0")
         conn.commit()
     
     cursor.close()

@@ -224,6 +224,7 @@
     <!-- Main Content -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
         
+        {% block page_header %}
         <!-- Header -->
         <header class="bg-white/80 backdrop-blur-sm border-b border-gray-100 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-10">
             <div class="flex items-center gap-4">
@@ -236,6 +237,7 @@
             </div>
             <span class="text-xs text-textTertiary hidden sm:inline-block">v2.0 专业版</span>
         </header>
+        {% endblock %}
 
         <!-- Content Scroll Area -->
         <main class="flex-1 overflow-y-auto p-0">
@@ -265,8 +267,9 @@
         function createBaseBubbles() {
             const container = document.getElementById('bubble-container-base');
             if (!container) return;
+            if (container.childElementCount > 0) return;
             
-            const bubbleCount = 40;
+            const bubbleCount = 18;
             const gradients = [
                 'bg-gradient-to-tr from-pink-300 to-blue-300',
                 'bg-gradient-to-b from-yellow-200 to-red-200',
@@ -307,7 +310,16 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', createBaseBubbles);
+        function scheduleBaseBubbles() {
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(createBaseBubbles, { timeout: 1500 });
+                return;
+            }
+
+            setTimeout(createBaseBubbles, 800);
+        }
+
+        document.addEventListener('DOMContentLoaded', scheduleBaseBubbles);
     </script>
 </body>
 </html>

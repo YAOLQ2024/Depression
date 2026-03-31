@@ -3,6 +3,7 @@
 {% block title %}测评进行中 - SDS 抑郁自评与辅助分析系统{% endblock %}
 
 {% block breadcrumb %}{% endblock %}
+{% block page_header %}{% endblock %}
 
 {% block content %}
 <style>
@@ -114,47 +115,28 @@
     <div class="ambient-sphere w-[400px] h-[400px] bottom-0 left-1/3 bg-indigo-50/30 animate-float-slow fixed"></div>
     <div id="bubble-container" class="fixed inset-0 pointer-events-none overflow-hidden z-0"></div>
 
-    <!-- SDS 顶部进度栏 -->
-    <header class="relative z-50 bg-white/30 backdrop-blur-sm border-b border-white/40 px-6 py-4 -mx-4 sm:-mx-6 lg:-mx-8 mb-6">
-        <div class="max-w-7xl mx-auto flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                </div>
-                <div>
-                    <h1 class="font-bold text-slate-800 text-lg leading-none tracking-tight">SDS 测评</h1>
-                    <p class="text-[10px] text-slate-500 font-medium tracking-wide uppercase mt-0.5">Assessment in Progress</p>
-                </div>
-            </div>
-
-            <!-- 进度条 -->
-            <div class="flex-1 max-w-xl mx-8 hidden md:block group">
-                <div class="flex justify-between text-xs font-semibold text-slate-500 mb-2">
-                    <span class="group-hover:text-blue-600 transition-colors">测评进度</span>
-                    <span class="text-blue-600 font-mono" x-text="String(currentQuestionIndex + 1).padStart(2, '0') + ' / 20'">01 / 20</span>
-                </div>
-                <div class="w-full bg-slate-200/60 h-2 rounded-full overflow-hidden backdrop-blur-sm">
-                    <div class="bg-gradient-to-r from-blue-400 to-indigo-500 h-2 rounded-full transition-all duration-700 ease-out shadow-[0_0_12px_rgba(59,130,246,0.6)] relative" :style="'width: ' + ((currentQuestionIndex + 1) / 20 * 100) + '%'">
-                        <div class="absolute right-0 top-0 h-2 w-2 bg-white rounded-full opacity-50 animate-pulse"></div>
+    <!-- SDS 顶部超薄进度条 -->
+    <header class="relative z-50 bg-white/20 backdrop-blur-sm border-b border-white/35 px-6 py-2 -mx-4 sm:-mx-6 lg:-mx-8 mb-3">
+        <div class="max-w-7xl mx-auto flex items-center gap-4">
+            <span class="text-[11px] text-blue-600 font-mono font-semibold shrink-0" x-text="String(currentQuestionIndex + 1).padStart(2, '0') + ' / 20'">01 / 20</span>
+            <div class="flex-1">
+                <div class="w-full bg-slate-200/55 h-1.5 rounded-full overflow-hidden backdrop-blur-sm">
+                    <div class="bg-gradient-to-r from-blue-400 to-indigo-500 h-1.5 rounded-full transition-all duration-700 ease-out shadow-[0_0_10px_rgba(59,130,246,0.45)] relative" :style="'width: ' + ((currentQuestionIndex + 1) / 20 * 100) + '%'">
+                        <div class="absolute right-0 top-0 h-1.5 w-1.5 bg-white rounded-full opacity-80"></div>
                     </div>
                 </div>
             </div>
-
-            <a href="{{ url_for('main.main') }}" class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/60 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-all text-sm font-semibold shadow-sm hover:shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                暂存退出
-            </a>
         </div>
     </header>
 
     <!-- 主体内容区 -->
     <main class="relative z-10 w-full px-[30px] pb-8">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-start" x-data="{ leftHeight: 0 }" x-init="$nextTick(() => { leftHeight = $refs.leftSection.offsetHeight })">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-8 xl:gap-9 items-start" x-data="{ leftHeight: 0 }" x-init="$nextTick(() => { leftHeight = $refs.leftSection.offsetHeight })">
             
             <!-- 左侧：答题区 + 下方小卡片 -->
-            <section class="lg:col-span-8 xl:col-span-9 relative min-w-0 flex flex-col gap-6" x-ref="leftSection">
+            <section class="lg:col-span-7 xl:col-span-8 relative min-w-0 flex flex-col gap-5" x-ref="leftSection">
                 <form id="sds-form" action="{{ url_for('test.SDS_submit') }}" method="POST" class="h-full">
-                    <div class="glass-panel rounded-[32px] p-8 md:p-12 xl:p-14 shadow-card relative flex flex-col h-full">
+                    <div class="glass-panel rounded-[32px] p-7 md:p-10 xl:p-11 shadow-card relative flex flex-col h-full">
                         <div class="pattern-dots"></div>
                         
                         <!-- 卡片内氛围泡泡 -->
@@ -178,10 +160,10 @@
                         <div class="absolute top-8 left-8 text-blue-100/50 font-serif text-[120px] leading-none select-none pointer-events-none -translate-y-8 -translate-x-4">"</div>
 
                         <!-- 题目内容区 -->
-                        <div class="relative z-10 flex-grow flex items-center gap-8 xl:gap-16">
+                        <div class="relative z-10 flex-grow flex items-end gap-4 xl:gap-6 2xl:gap-8">
                             
                             <!-- 答题区 -->
-                            <div class="flex-1 flex flex-col justify-center xl:pr-8">
+                            <div class="flex-[1.08] flex flex-col justify-start xl:pr-3">
                                 <div class="mb-8 relative">
                                     <div class="flex items-center gap-4 mb-6">
                                         <span class="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold tracking-wider shadow-sm">
@@ -223,14 +205,18 @@
                             </div>
 
                             <!-- 右侧：题目视频 -->
-                            <div class="hidden xl:flex flex-1 items-center justify-center h-full overflow-hidden relative px-4">
-                                <div class="w-full h-full max-w-full max-h-full bg-black rounded-2xl border-2 border-slate-200/30 relative overflow-hidden shadow-xl">
-                                    <video id="question-video" class="w-full h-full object-cover" autoplay playsinline>
-                                        <source src="/static/video/1.mp4" type="video/mp4" id="video-source">
+                            <div class="hidden xl:flex flex-[0.62] items-end justify-start h-full overflow-visible relative pl-0 pr-0 -ml-2 pb-1">
+                                <div class="w-full max-w-[310px] min-h-[388px] aspect-[4/5] bg-black rounded-2xl border-2 border-slate-200/30 relative overflow-hidden shadow-xl">
+                                    <video id="question-video" class="w-full h-full object-cover" preload="auto" playsinline>
                                         您的浏览器不支持视频播放
                                     </video>
+                                    <div id="video-loading-indicator" class="absolute inset-0 hidden items-center justify-center bg-black/35 backdrop-blur-sm z-10">
+                                        <div class="px-4 py-2 rounded-xl bg-black/60 text-white text-xs font-medium border border-white/20">
+                                            题目视频加载中...
+                                        </div>
+                                    </div>
                                     <!-- 播放按钮（当视频需要用户交互时显示） -->
-                                    <button id="video-play-btn" type="button" class="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity z-20 hidden">
+                                    <button id="video-play-btn" type="button" class="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity z-20 hidden">
                                         <div class="w-16 h-16 rounded-full bg-white/90 flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-800 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -251,13 +237,13 @@
                         </div>
 
                         <!-- 底部交互栏 -->
-                        <div class="relative z-10 mt-auto border-t border-slate-200/50 pt-6">
-                            <div class="flex flex-col xl:flex-row items-center gap-5">
+                        <div class="relative z-10 mt-auto border-t border-slate-200/50 pt-5">
+                            <div class="flex flex-col xl:flex-row xl:flex-nowrap xl:items-center gap-3 xl:gap-4 xl:max-w-[860px]">
                                 
                                 <!-- Voice Button -->
-                                <div @click="startVoiceRecording" class="flex items-center gap-4 shrink-0 p-1.5 pr-5 rounded-full border shadow-sm backdrop-blur-md transition-all cursor-pointer group/voice"
+                                <div @click="startVoiceRecording" class="flex items-center gap-3 shrink-0 p-1 pr-4 rounded-full border shadow-sm backdrop-blur-md transition-all cursor-pointer group/voice"
                                     :class="isRecording ? 'bg-rose-50 border-rose-300 hover:bg-rose-100' : 'bg-white/40 border-white/60 hover:bg-white/60'">
-                                    <button type="button" class="w-11 h-11 rounded-full bg-gradient-to-r text-white flex items-center justify-center shadow-lg transition-all"
+                                    <button type="button" class="w-10 h-10 rounded-full bg-gradient-to-r text-white flex items-center justify-center shadow-lg transition-all"
                                         :class="isRecording ? 'from-red-500 to-rose-600 animate-pulse scale-110' : 'from-rose-400 to-orange-400 group-hover/voice:scale-105'">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
                                     </button>
@@ -281,7 +267,7 @@
                                 </div>
 
                                 <!-- Transcript (Middle) -->
-                                <div class="w-full xl:flex-1 border rounded-xl p-3 flex items-center gap-3 shadow-inner-text group transition-all min-h-[60px]"
+                                <div class="w-full xl:flex-[0.82] xl:max-w-[380px] border rounded-xl p-2.5 flex items-center gap-2.5 shadow-inner-text group transition-all min-h-[54px]"
                                     :class="isRecording ? 'bg-rose-50/70 border-rose-200' : 'bg-slate-50/50 border-slate-200/60 hover:bg-white/60'">
                                      <div class="shrink-0 flex items-center gap-2">
                                          <span class="flex h-1.5 w-1.5 rounded-full"
@@ -298,18 +284,18 @@
                                 </div>
 
                                 <!-- Navigation Buttons -->
-                                <div class="flex gap-3 w-full xl:w-auto justify-between xl:justify-start ml-auto">
+                                <div class="flex gap-2 w-full xl:w-auto justify-between xl:justify-start">
                                     <button type="button" @click="prevQuestion" :disabled="currentQuestionIndex === 0"
-                                        class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white/50 text-slate-500 font-semibold hover:bg-white hover:text-slate-700 transition-all shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                                        class="px-4 py-2.5 rounded-xl border border-slate-200 bg-white/50 text-slate-500 font-semibold hover:bg-white hover:text-slate-700 transition-all shadow-sm text-sm disabled:opacity-50 disabled:cursor-not-allowed">
                                         上一题
                                     </button>
                                     <button type="button" x-show="currentQuestionIndex < 19" @click="nextQuestion"
-                                        class="px-6 py-2.5 rounded-xl bg-slate-900 text-white font-semibold shadow-lg hover:bg-slate-800 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm">
+                                        class="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold shadow-lg hover:bg-slate-800 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm">
                                         下一题
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
                                     </button>
                                     <button type="button" x-show="currentQuestionIndex === 19" @click="submitAssessment"
-                                        class="px-6 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm">
+                                        class="px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white font-semibold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm">
                                         提交问卷
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                                     </button>
@@ -326,9 +312,9 @@
                 </form>
 
                 <!-- 下方填充卡片 -->
-                <div class="grid grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-5">
                     <!-- 提示卡片 -->
-                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden hover:shadow-lg transition-all duration-300">
+                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden hover:shadow-lg transition-all duration-300 md:col-span-8">
                         <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-100/40 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
                         <div class="relative z-10">
                             <div class="flex items-center gap-3 mb-3">
@@ -342,7 +328,7 @@
                     </div>
 
                     <!-- 进度卡片 -->
-                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden hover:shadow-lg transition-all duration-300">
+                    <div class="glass-panel rounded-2xl p-6 relative overflow-hidden hover:shadow-lg transition-all duration-300 md:col-span-4 md:justify-self-end md:w-full xl:max-w-[260px]">
                         <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-100/40 to-transparent rounded-full -translate-y-8 translate-x-8"></div>
                         <div class="relative z-10">
                             <div class="flex items-center gap-3 mb-3">
@@ -362,8 +348,8 @@
             </section>
 
             <!-- 右侧：多模态监测 -->
-            <aside class="lg:col-span-4 xl:col-span-3 relative z-20 overflow-hidden">
-                <div class="h-full overflow-y-auto pr-2 flex flex-col gap-5" :style="'max-height: ' + leftHeight + 'px'">
+            <aside class="lg:col-span-5 xl:col-span-4 relative z-20 overflow-hidden">
+                <div class="h-full overflow-y-auto pr-0 lg:pl-1 flex flex-col gap-5" :style="'max-height: ' + leftHeight + 'px'">
 
                 <!-- 摄像头 -->
                 <div class="glass-panel rounded-2xl p-4 overflow-hidden relative hover:shadow-lg transition-all duration-500 shrink-0">
@@ -436,7 +422,7 @@
                     <!-- 题目网格 -->
                     <div class="grid grid-cols-5 gap-1.5">
                         <template x-for="(answer, idx) in answers" :key="idx">
-                            <button type="button" @click="currentQuestionIndex = idx; window.scrollTo({ top: 0, behavior: 'smooth' });"
+                            <button type="button" @click="goToQuestion(idx)"
                                 :class="{
                                     'bg-blue-500 text-white border-blue-600 shadow-md': answer !== null && currentQuestionIndex !== idx,
                                     'bg-indigo-600 text-white border-indigo-700 shadow-lg ring-2 ring-indigo-400 ring-offset-2 scale-105': currentQuestionIndex === idx && answer !== null,
@@ -461,15 +447,56 @@
 {% endblock %}
 
 {% block scripts %}
+<script type="application/json" id="sds-initial-state">{{ sds_initial_state | tojson }}</script>
 <script>
 document.addEventListener('alpine:init', () => {
+    const initialStateElement = document.getElementById('sds-initial-state');
+    let initialState = {};
+
+    if (initialStateElement && initialStateElement.textContent) {
+        try {
+            initialState = JSON.parse(initialStateElement.textContent);
+        } catch (error) {
+            console.error('解析 SDS 初始状态失败:', error);
+        }
+    }
+
+    const initialAnswers = Array.isArray(initialState.answers) ? initialState.answers.slice(0, 20) : [];
+    const normalizedInitialAnswers = initialAnswers.map(value => {
+        const normalizedValue = value === null || value === undefined ? null : String(value);
+        return ['1', '2', '3', '4'].includes(normalizedValue) ? normalizedValue : null;
+    });
+
+    while (normalizedInitialAnswers.length < 20) {
+        normalizedInitialAnswers.push(null);
+    }
+
+    const initialQuestionIndex = Number.isFinite(Number(initialState.currentQuestionIndex))
+        ? Math.max(0, Math.min(19, Number(initialState.currentQuestionIndex)))
+        : 0;
+
     Alpine.data('sdsAssessment', () => ({
-        currentQuestionIndex: 0,
-        answers: Array(20).fill(null),
+        currentQuestionIndex: initialQuestionIndex,
+        answers: [...normalizedInitialAnswers],
+        testId: initialState.testId || null,
         videoStream: null,
         isRecording: false,
         recognition: null,
         transcriptText: '语音识别结果将在这里显示...',
+        elapsedOffsetSeconds: Math.max(0, Number(initialState.savedUseTime) || 0),
+        progressSaveTimer: null,
+        lastSavedProgressFingerprint: '',
+        isSavingProgress: false,
+        disableAutoSave: false,
+        emotionDetectionTimer: null,
+        emotionDetectionInFlight: false,
+        eegTimer: null,
+        eegFetchInFlight: false,
+        resizeEEGHandler: null,
+        questionVideoPlayRequestId: 0,
+        questionVideoEventsBound: false,
+        pageLifecycleBound: false,
+        videoPreloadCache: new Map(),
         
         questions: [
             { text: "我觉得闷闷不乐，情绪低沉" },
@@ -501,106 +528,392 @@ document.addEventListener('alpine:init', () => {
             { value: "4", label: "绝大部分或全部时间" }
         ],
 
-        init() {
-            // 记录开始时间
-            this.startTime = Date.now();
-            
-            // 设置视频播放按钮点击事件
+        scheduleDeferredTask(task, timeout = 1000, fallbackDelay = timeout) {
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(() => task(), { timeout });
+                return;
+            }
+
+            setTimeout(task, fallbackDelay);
+        },
+
+        getElapsedTimeSeconds() {
+            return this.elapsedOffsetSeconds + Math.floor((Date.now() - this.startTime) / 1000);
+        },
+
+        buildAnswersPayload() {
+            const answersPayload = {};
+
+            this.answers.forEach((answer, index) => {
+                if (answer !== null) {
+                    answersPayload[index + 1] = {
+                        value: parseInt(answer, 10),
+                        option: String.fromCharCode(64 + parseInt(answer, 10))
+                    };
+                }
+            });
+
+            return answersPayload;
+        },
+
+        getProgressFingerprint() {
+            return JSON.stringify({
+                answers: this.answers,
+                currentQuestionIndex: this.currentQuestionIndex
+            });
+        },
+
+        scheduleProgressSave(delay = 220) {
+            if (this.progressSaveTimer) {
+                clearTimeout(this.progressSaveTimer);
+            }
+
+            this.progressSaveTimer = window.setTimeout(() => {
+                this.persistProgress();
+            }, delay);
+        },
+
+        async persistProgress({ useBeacon = false, force = false } = {}) {
+            if (this.disableAutoSave || !this.testId) {
+                return false;
+            }
+
+            const payload = {
+                answers: this.buildAnswersPayload(),
+                currentQuestionIndex: this.currentQuestionIndex,
+                totalTime: this.getElapsedTimeSeconds()
+            };
+            const fingerprint = this.getProgressFingerprint();
+
+            if (!force && fingerprint === this.lastSavedProgressFingerprint) {
+                return true;
+            }
+
+            const serializedPayload = JSON.stringify(payload);
+
+            if (useBeacon && navigator.sendBeacon) {
+                const beaconSent = navigator.sendBeacon(
+                    '/SDS/save-progress',
+                    new Blob([serializedPayload], { type: 'application/json' })
+                );
+
+                if (beaconSent) {
+                    this.lastSavedProgressFingerprint = fingerprint;
+                }
+
+                return beaconSent;
+            }
+
+            if (this.isSavingProgress && !force) {
+                return false;
+            }
+
+            try {
+                this.isSavingProgress = true;
+                const response = await fetch('/SDS/save-progress', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: serializedPayload,
+                    keepalive: useBeacon || force
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data.success) {
+                    this.lastSavedProgressFingerprint = fingerprint;
+                    if (data.test_id) {
+                        this.testId = data.test_id;
+                    }
+                    return true;
+                }
+            } catch (error) {
+                console.error('自动暂存失败:', error);
+            } finally {
+                this.isSavingProgress = false;
+            }
+
+            return false;
+        },
+
+        setupPageLifecycle() {
+            if (this.pageLifecycleBound) {
+                return;
+            }
+
+            this.pageLifecycleBound = true;
+            window.addEventListener('pagehide', () => this.cleanupPageResources(), { once: true });
+        },
+
+        cleanupPageResources() {
+            if (this.progressSaveTimer) {
+                clearTimeout(this.progressSaveTimer);
+                this.progressSaveTimer = null;
+            }
+
+            this.persistProgress({ useBeacon: true, force: true });
+
+            if (this.emotionDetectionTimer) {
+                clearTimeout(this.emotionDetectionTimer);
+                this.emotionDetectionTimer = null;
+            }
+
+            if (this.eegTimer) {
+                clearTimeout(this.eegTimer);
+                this.eegTimer = null;
+            }
+
+            this.emotionDetectionInFlight = false;
+            this.eegFetchInFlight = false;
+
+            if (this.resizeEEGHandler) {
+                window.removeEventListener('resize', this.resizeEEGHandler);
+                this.resizeEEGHandler = null;
+            }
+
+            if (this.videoStream) {
+                this.videoStream.getTracks().forEach(track => track.stop());
+                this.videoStream = null;
+            }
+
+            this.videoPreloadCache.forEach(preloadedVideo => {
+                preloadedVideo.pause();
+                preloadedVideo.removeAttribute('src');
+                preloadedVideo.load();
+            });
+            this.videoPreloadCache.clear();
+        },
+
+        setVideoLoading(isLoading) {
+            const loadingIndicator = document.getElementById('video-loading-indicator');
+            if (!loadingIndicator) return;
+
+            loadingIndicator.classList.toggle('hidden', !isLoading);
+            loadingIndicator.classList.toggle('flex', isLoading);
+        },
+
+        showVideoPlayButton() {
             const playBtn = document.getElementById('video-play-btn');
+            if (playBtn) {
+                playBtn.classList.remove('hidden');
+            }
+        },
+
+        hideVideoPlayButton() {
+            const playBtn = document.getElementById('video-play-btn');
+            if (playBtn) {
+                playBtn.classList.add('hidden');
+            }
+        },
+
+        getQuestionVideoUrl(questionIndex = this.currentQuestionIndex) {
+            return `/static/video/${questionIndex + 1}.mp4`;
+        },
+
+        preloadQuestionVideo(questionIndex) {
+            if (questionIndex < 0 || questionIndex >= this.questions.length) {
+                return;
+            }
+
+            const videoUrl = this.getQuestionVideoUrl(questionIndex);
+            if (this.videoPreloadCache.has(videoUrl)) {
+                return;
+            }
+
+            const preloadVideo = document.createElement('video');
+            preloadVideo.preload = 'auto';
+            preloadVideo.muted = true;
+            preloadVideo.playsInline = true;
+            preloadVideo.src = videoUrl;
+            preloadVideo.load();
+            this.videoPreloadCache.set(videoUrl, preloadVideo);
+
+            const maxPreloadedVideos = 4;
+            if (this.videoPreloadCache.size > maxPreloadedVideos) {
+                const removableKeys = Array.from(this.videoPreloadCache.keys())
+                    .filter(key => key !== videoUrl)
+                    .slice(0, this.videoPreloadCache.size - maxPreloadedVideos);
+
+                removableKeys.forEach(key => {
+                    const cachedVideo = this.videoPreloadCache.get(key);
+                    if (cachedVideo) {
+                        cachedVideo.pause();
+                        cachedVideo.removeAttribute('src');
+                        cachedVideo.load();
+                    }
+                    this.videoPreloadCache.delete(key);
+                });
+            }
+        },
+
+        preloadUpcomingQuestionVideos(questionIndex = this.currentQuestionIndex) {
+            this.preloadQuestionVideo(questionIndex);
+
+            for (let offset = 1; offset <= 3; offset++) {
+                this.preloadQuestionVideo(questionIndex + offset);
+            }
+        },
+
+        bindQuestionVideoEvents() {
             const video = document.getElementById('question-video');
-            if (playBtn && video) {
+            const playBtn = document.getElementById('video-play-btn');
+            if (!video || this.questionVideoEventsBound) {
+                return;
+            }
+
+            if (playBtn) {
                 playBtn.addEventListener('click', () => {
                     video.play().catch(err => {
                         console.error('播放视频失败:', err);
                     });
                 });
             }
-            
-            // 立即执行不阻塞的初始化
-            this.playQuestionVideo(); // 播放第一题视频
-            
-            // 使用 requestIdleCallback 在浏览器空闲时初始化，避免阻塞渲染
-            if ('requestIdleCallback' in window) {
-                requestIdleCallback(() => {
-                    this.createBubbles();
-                    this.initSpeechRecognition();
-                }, { timeout: 500 });
-                
-                requestIdleCallback(() => {
-                    this.initCamera();
-                    this.initEEG();
-                }, { timeout: 1500 });
-                
-                requestIdleCallback(() => {
-                    this.initEmotionDetection();
-                }, { timeout: 3000 });
-            } else {
-                // 降级方案：使用 setTimeout，延迟更长以避免阻塞
-                setTimeout(() => {
-                    this.createBubbles();
-                    this.initSpeechRecognition();
-                }, 200);
-                
-                setTimeout(() => {
-                    this.initCamera();
-                    this.initEEG();
-                }, 800);
-                
-                setTimeout(() => {
-                    this.initEmotionDetection();
-                }, 2000);
-            }
+
+            video.addEventListener('play', () => {
+                this.hideVideoPlayButton();
+            });
+
+            video.addEventListener('loadeddata', () => {
+                this.setVideoLoading(false);
+            });
+
+            video.addEventListener('canplay', () => {
+                this.setVideoLoading(false);
+            });
+
+            video.addEventListener('waiting', () => {
+                this.setVideoLoading(true);
+            });
+
+            video.addEventListener('pause', () => {
+                if (!video.ended && video.currentTime > 0 && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                    this.showVideoPlayButton();
+                }
+            });
+
+            video.addEventListener('error', () => {
+                this.setVideoLoading(false);
+                this.showVideoPlayButton();
+            });
+
+            this.questionVideoEventsBound = true;
         },
-        
-        playQuestionVideo() {
+
+        init() {
+            this.startTime = Date.now();
+            this.lastSavedProgressFingerprint = this.getProgressFingerprint();
+            this.setupPageLifecycle();
+            this.bindQuestionVideoEvents();
+
+            requestAnimationFrame(() => {
+                this.playQuestionVideo();
+                this.preloadUpcomingQuestionVideos(0);
+            });
+
+            this.scheduleDeferredTask(() => this.initSpeechRecognition(), 300, 150);
+            this.scheduleDeferredTask(() => this.createBubbles(), 1500, 900);
+            this.scheduleDeferredTask(async () => {
+                const cameraReady = await this.initCamera();
+                if (cameraReady) {
+                    this.scheduleDeferredTask(() => this.initEmotionDetection(), 2200, 1200);
+                }
+            }, 1200, 600);
+            this.scheduleDeferredTask(() => this.initEEG(), 1800, 1000);
+        },
+
+        async playQuestionVideo({ fromUserInteraction = false } = {}) {
             const video = document.getElementById('question-video');
-            const videoSource = document.getElementById('video-source');
             const questionNumber = document.getElementById('video-question-number');
-            const playBtn = document.getElementById('video-play-btn');
-            
-            if (video && videoSource) {
-                // 更新题号显示
-                if (questionNumber) {
-                    questionNumber.textContent = 'Q' + String(this.currentQuestionIndex + 1).padStart(2, '0');
-                }
-                
-                // 更新视频源
-                videoSource.src = `/static/video/${this.currentQuestionIndex + 1}.mp4`;
-                video.load();
-                
-                // 隐藏播放按钮
-                if (playBtn) {
-                    playBtn.classList.add('hidden');
-                }
-                
-                // 延迟播放以确保加载完成
-                setTimeout(() => {
-                    video.play().catch(err => {
-                        console.log('视频自动播放失败（需要用户交互）:', err);
-                        // 如果自动播放失败（通常是因为浏览器策略要求用户交互），显示播放按钮
-                        if (playBtn) {
-                            playBtn.classList.remove('hidden');
-                        }
-                    });
-                }, 200);
-                
-                // 监听视频播放状态，播放时隐藏按钮
-                video.addEventListener('play', () => {
-                    if (playBtn) {
-                        playBtn.classList.add('hidden');
-                    }
-                });
-                
-                // 监听视频暂停状态，暂停时显示按钮
-                video.addEventListener('pause', () => {
-                    if (playBtn && video.readyState >= 2) { // 确保视频已加载
-                        playBtn.classList.remove('hidden');
-                    }
-                });
+            if (!video) {
+                return;
             }
+
+            const videoUrl = this.getQuestionVideoUrl(this.currentQuestionIndex);
+            const nextVideoHref = new URL(videoUrl, window.location.origin).href;
+            const playRequestId = ++this.questionVideoPlayRequestId;
+
+            if (questionNumber) {
+                questionNumber.textContent = 'Q' + String(this.currentQuestionIndex + 1).padStart(2, '0');
+            }
+
+            this.setVideoLoading(true);
+            this.hideVideoPlayButton();
+            this.preloadUpcomingQuestionVideos(this.currentQuestionIndex);
+
+            const currentVideoHref = video.currentSrc || video.src;
+            if (currentVideoHref !== nextVideoHref) {
+                video.pause();
+                video.src = videoUrl;
+                video.load();
+            } else {
+                video.currentTime = 0;
+            }
+
+            const tryPlay = async () => {
+                try {
+                    await video.play();
+                    if (playRequestId === this.questionVideoPlayRequestId) {
+                        this.hideVideoPlayButton();
+                    }
+                } catch (err) {
+                    console.log('视频自动播放失败（需要用户交互）:', err);
+                    if (playRequestId === this.questionVideoPlayRequestId) {
+                        this.showVideoPlayButton();
+                    }
+                }
+            };
+
+            if (fromUserInteraction) {
+                await tryPlay();
+                return;
+            }
+
+            if (video.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+                this.setVideoLoading(false);
+                await tryPlay();
+                return;
+            }
+
+            const handleReady = async () => {
+                cleanup();
+                if (playRequestId !== this.questionVideoPlayRequestId) {
+                    return;
+                }
+
+                this.setVideoLoading(false);
+                await tryPlay();
+            };
+
+            const handleError = () => {
+                cleanup();
+                if (playRequestId !== this.questionVideoPlayRequestId) {
+                    return;
+                }
+
+                this.setVideoLoading(false);
+                this.showVideoPlayButton();
+            };
+
+            const cleanup = () => {
+                video.removeEventListener('loadeddata', handleReady);
+                video.removeEventListener('canplay', handleReady);
+                video.removeEventListener('error', handleError);
+            };
+
+            video.addEventListener('loadeddata', handleReady, { once: true });
+            video.addEventListener('canplay', handleReady, { once: true });
+            video.addEventListener('error', handleError, { once: true });
         },
 
         async initCamera() {
+            if (this.videoStream) {
+                return true;
+            }
+
             try {
                 // 请求浏览器摄像头权限
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -613,19 +926,29 @@ document.addEventListener('alpine:init', () => {
                 
                 const videoElement = document.getElementById('video-preview');
                 if (videoElement) {
+                    this.videoStream = stream;
                     videoElement.srcObject = stream;
+                    await videoElement.play().catch(() => {});
                     console.log('✓ 摄像头已授权并启动');
                 }
+
+                return true;
             } catch (error) {
                 console.error('摄像头权限被拒绝或无法访问:', error);
                 const labelElement = document.getElementById('emotion-label');
                 if (labelElement) {
                     labelElement.textContent = '摄像头未授权';
                 }
+
+                return false;
             }
         },
 
         initEmotionDetection() {
+            if (this.emotionDetectionTimer) {
+                return;
+            }
+
             const videoElement = document.getElementById('video-preview');
             const canvas = document.getElementById('video-canvas');
             const ctx = canvas.getContext('2d');
@@ -633,19 +956,44 @@ document.addEventListener('alpine:init', () => {
             
             if (!videoElement || !canvas || !ctx) return;
             
-            // 设置canvas尺寸
-            videoElement.addEventListener('loadedmetadata', () => {
+            const syncCanvasSize = () => {
                 canvas.width = videoElement.videoWidth || 640;
                 canvas.height = videoElement.videoHeight || 480;
-            });
+            };
+
+            videoElement.addEventListener('loadedmetadata', syncCanvasSize, { once: true });
+            syncCanvasSize();
+
+            if (labelElement) {
+                labelElement.textContent = '模型预热中...';
+            }
+
+            const scheduleNextCapture = (delay = 1500) => {
+                this.emotionDetectionTimer = window.setTimeout(captureAndDetect, delay);
+            };
             
             // 定期捕获视频帧并发送到服务器
             const captureAndDetect = async () => {
+                if (document.visibilityState === 'hidden') {
+                    scheduleNextCapture(1500);
+                    return;
+                }
+
+                if (this.emotionDetectionInFlight) {
+                    scheduleNextCapture(300);
+                    return;
+                }
+
+                let nextDelay = 1500;
+
                 try {
                     // 检查视频是否就绪
-                    if (videoElement.readyState !== videoElement.HAVE_ENOUGH_DATA) {
+                    if (videoElement.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !canvas.width || !canvas.height) {
+                        nextDelay = 500;
                         return;
                     }
+
+                    this.emotionDetectionInFlight = true;
                     
                     // 捕获当前帧
                     ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
@@ -661,9 +1009,12 @@ document.addEventListener('alpine:init', () => {
                         },
                         body: JSON.stringify({ image: base64Data })
                     });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
                     
                     const data = await response.json();
-                    console.log('表情检测响应:', data); // 调试日志
                     
                     if (data.success) {
                         // 后端返回格式: { success: true, dominant_emotion: 'neutral', confidence: 0.537, ... }
@@ -702,33 +1053,43 @@ document.addEventListener('alpine:init', () => {
                     if (labelElement) {
                         labelElement.textContent = '网络错误';
                     }
+                } finally {
+                    this.emotionDetectionInFlight = false;
+                    scheduleNextCapture(nextDelay);
                 }
             };
             
-            // 每500ms捕获一次（2fps，减少服务器负载）
-            setInterval(captureAndDetect, 500);
+            scheduleNextCapture(800);
         },
         
         selectAnswer(value) {
             this.answers[this.currentQuestionIndex] = value;
+            this.scheduleProgressSave();
             if (this.currentQuestionIndex < 19) {
-                setTimeout(() => this.nextQuestion(), 200);
+                this.goToQuestion(this.currentQuestionIndex + 1);
             }
+        },
+
+        goToQuestion(index) {
+            if (index < 0 || index >= this.questions.length) {
+                return;
+            }
+
+            this.currentQuestionIndex = index;
+            this.scheduleProgressSave();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            this.playQuestionVideo({ fromUserInteraction: true });
         },
         
         nextQuestion() {
             if (this.currentQuestionIndex < 19) {
-                this.currentQuestionIndex++;
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                this.playQuestionVideo();
+                this.goToQuestion(this.currentQuestionIndex + 1);
             }
         },
         
         prevQuestion() {
             if (this.currentQuestionIndex > 0) {
-                this.currentQuestionIndex--;
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-                this.playQuestionVideo();
+                this.goToQuestion(this.currentQuestionIndex - 1);
             }
         },
         
@@ -736,24 +1097,17 @@ document.addEventListener('alpine:init', () => {
             const unanswered = this.answers.findIndex(a => a === null);
             if (unanswered !== -1) {
                 alert(`请先完成所有题目，第 ${unanswered + 1} 题未作答。`);
-                this.currentQuestionIndex = unanswered;
-                window.scrollTo({ top: 0, behavior: 'smooth' });
+                this.goToQuestion(unanswered);
                 return;
             }
-            
-            // 转换answers数组为对象格式
-            const answersObj = {};
-            this.answers.forEach((answer, index) => {
-                if (answer !== null) {
-                    answersObj[index + 1] = {
-                        value: parseInt(answer),
-                        option: String.fromCharCode(64 + parseInt(answer)) // 1->A, 2->B, 3->C, 4->D
-                    };
-                }
-            });
-            
-            // 计算总用时（秒）
-            const totalTime = Math.floor((Date.now() - this.startTime) / 1000);
+
+            if (this.progressSaveTimer) {
+                clearTimeout(this.progressSaveTimer);
+                this.progressSaveTimer = null;
+            }
+
+            const answersObj = this.buildAnswersPayload();
+            const totalTime = this.getElapsedTimeSeconds();
             
             try {
                 const response = await fetch('/SDS/submit', {
@@ -763,7 +1117,8 @@ document.addEventListener('alpine:init', () => {
                     },
                     body: JSON.stringify({
                         answers: answersObj,
-                        totalTime: totalTime
+                        totalTime: totalTime,
+                        currentQuestionIndex: this.currentQuestionIndex
                     })
                 });
                 
@@ -772,6 +1127,8 @@ document.addEventListener('alpine:init', () => {
                 if (data.success) {
                     // 跳转到提交成功页面，传递record_id
                     const recordId = data.record_id || data.test_id;
+                    this.disableAutoSave = true;
+                    this.testId = null;
                     if (recordId) {
                         window.location.href = `/submit_success.html?record_id=${recordId}`;
                     } else {
@@ -790,6 +1147,10 @@ document.addEventListener('alpine:init', () => {
         startTime: Date.now(),
 
         initEEG() {
+            if (this.eegTimer) {
+                return;
+            }
+
             const canvases = [
                 document.getElementById('eegCanvas1'),
                 document.getElementById('eegCanvas2'),
@@ -802,20 +1163,36 @@ document.addEventListener('alpine:init', () => {
             const waveforms = [[], [], []];
             const maxPoints = 200; // 保留最近200个数据点
             
-            function resizeCanvases() {
+            const resizeCanvases = () => {
                 canvases.forEach(canvas => {
                     if(canvas && canvas.parentElement) {
                         canvas.width = canvas.parentElement.offsetWidth;
                         canvas.height = canvas.parentElement.offsetHeight;
                     }
                 });
-            }
+            };
+            this.resizeEEGHandler = resizeCanvases;
             window.addEventListener('resize', resizeCanvases);
-            setTimeout(resizeCanvases, 100);
+            requestAnimationFrame(resizeCanvases);
+
+            const scheduleNextFetch = (delay = 250) => {
+                this.eegTimer = window.setTimeout(fetchEEGData, delay);
+            };
 
             // 从后端获取EEG数据
             const fetchEEGData = async () => {
+                if (document.visibilityState === 'hidden') {
+                    scheduleNextFetch(500);
+                    return;
+                }
+
+                if (this.eegFetchInFlight) {
+                    scheduleNextFetch(100);
+                    return;
+                }
+
                 try {
+                    this.eegFetchInFlight = true;
                     const response = await fetch('/eeg/channels');
                     const data = await response.json();
                     if (data.success && data.data) {
@@ -830,11 +1207,12 @@ document.addEventListener('alpine:init', () => {
                     }
                 } catch (error) {
                     console.error('获取EEG数据失败:', error);
+                } finally {
+                    this.eegFetchInFlight = false;
+                    scheduleNextFetch(250);
                 }
             };
             
-            // 每100ms获取一次数据
-            setInterval(fetchEEGData, 100);
             fetchEEGData();
             
             function drawEEG() {
@@ -894,7 +1272,9 @@ document.addEventListener('alpine:init', () => {
         createBubbles() {
             const container = document.getElementById('bubble-container');
             if (!container) return;
-            const bubbleCount = 40;
+            if (container.childElementCount > 0) return;
+
+            const bubbleCount = 18;
             const gradients = [
                 'bg-gradient-to-tr from-pink-300 to-blue-300',
                 'bg-teal-200', 'bg-blue-300', 'bg-indigo-300', 'bg-orange-200', 'bg-white'

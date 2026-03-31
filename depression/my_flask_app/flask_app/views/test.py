@@ -15,6 +15,98 @@ def get_beijing_time():
     # 系统本地时间已经是北京时间，直接返回
     return datetime.datetime.now()
 
+
+def _normalize_choice_string(choice_value):
+    """将数据库中的答案串规范为20位字符串。"""
+    normalized = str(choice_value or '').strip()
+    digits_only = ''.join(char for char in normalized if char.isdigit())
+    return digits_only[:20].ljust(20, '0')
+
+
+def _choice_string_to_answers(choice_value):
+    """将答案串转换为前端可用的答案数组。"""
+    normalized = _normalize_choice_string(choice_value)
+    return [char if char in {'1', '2', '3', '4'} else None for char in normalized[:20]]
+
+
+def _answers_payload_to_choice_string(answers_payload):
+    """将前端提交的答案对象序列化为20位答案串。"""
+    answers_payload = answers_payload or {}
+    serialized = []
+
+    for i in range(1, 21):
+        answer_data = answers_payload.get(str(i)) or answers_payload.get(i)
+        value = None
+
+        if isinstance(answer_data, dict):
+            value = answer_data.get('value')
+        else:
+            value = answer_data
+
+        value_str = str(value).strip() if value is not None else '0'
+        serialized.append(value_str if value_str in {'1', '2', '3', '4'} else '0')
+
+    return ''.join(serialized)
+
+
+def _clamp_progress_index(progress_index):
+    try:
+        index = int(progress_index)
+    except (TypeError, ValueError):
+        index = 0
+
+    return max(0, min(19, index))
+
+
+def _resolve_resume_index(saved_index, answers):
+    if saved_index is not None:
+        try:
+            index = int(saved_index)
+        except (TypeError, ValueError):
+            index = None
+        else:
+            if 0 <= index < 20:
+                return index
+
+    for idx, answer in enumerate(answers):
+        if answer is None:
+            return idx
+
+    return 19
+
+
+def _find_active_test_for_user(user_id):
+    return db.fetch_one(
+        """
+        SELECT id, choose, use_time, progress_index, start_time
+        FROM test
+        WHERE user_id = ? AND status = '未完成'
+        ORDER BY start_time DESC, id DESC
+        LIMIT 1
+        """,
+        [user_id]
+    )
+
+
+def _ensure_active_test_id(user_id, preferred_test_id=None):
+    if preferred_test_id:
+        existing = db.fetch_one(
+            "SELECT id FROM test WHERE id = ? AND user_id = ? AND status = '未完成'",
+            [preferred_test_id, user_id]
+        )
+        if existing:
+            return existing['id']
+
+    active_test = _find_active_test_for_user(user_id)
+    if active_test:
+        return active_test['id']
+
+    now_time = datetime.datetime.now()
+    return db.insert(
+        "INSERT INTO test (role, user_id, start_time, status, progress_index) VALUES (?, ?, ?, ?, ?)",
+        [1, user_id, now_time, "未完成", 0]
+    )
+
 # 模块加载完成
 
 try:
@@ -50,34 +142,75 @@ def SDS():
     userinfo = session.get("userinfo")
     if not userinfo:
         return redirect('/login')
-    
-    now_time = datetime.datetime.now()
-    test_id = db.insert("INSERT INTO test (role, user_id, start_time, status) VALUES (?, ?, ?, ?)", [1, userinfo['id'], now_time, "未完成"])
 
+    test_id = _ensure_active_test_id(userinfo['id'], session.get("test_id"))
+    active_test = db.fetch_one(
+        "SELECT id, choose, use_time, progress_index FROM test WHERE id = ? AND user_id = ?",
+        [test_id, userinfo['id']]
+    ) or {}
+
+    saved_answers = _choice_string_to_answers(active_test.get('choose'))
+    resume_index = _resolve_resume_index(active_test.get('progress_index'), saved_answers)
     session["test_id"] = test_id
 
-    # 使用 SDS_working2.html（新版UI，使用 MJPEG 流，不使用 emotion-recognition.js）
-    return render_template("SDS_working2.html")
+    sds_initial_state = {
+        'testId': test_id,
+        'answers': saved_answers,
+        'currentQuestionIndex': resume_index,
+        'savedUseTime': int(active_test.get('use_time') or 0),
+    }
+
+    return render_template("SDS_working2.html", sds_initial_state=sds_initial_state)
+
+
+@ts.route('/SDS/save-progress', methods=["POST"])
+def SDS_save_progress():
+    userinfo = session.get("userinfo")
+    if not userinfo:
+        return jsonify({'success': False, 'error': '未登录'}), 401
+
+    data = request.get_json(silent=True) or {}
+    answers = data.get('answers') or {}
+    total_time = max(0, int(data.get('totalTime') or 0))
+    progress_index = _clamp_progress_index(data.get('currentQuestionIndex', 0))
+
+    test_id = _ensure_active_test_id(userinfo['id'], session.get("test_id"))
+    session["test_id"] = test_id
+
+    answer_string = _answers_payload_to_choice_string(answers)
+    db.update(
+        """
+        UPDATE test
+        SET choose = ?, use_time = ?, progress_index = ?, status = ?
+        WHERE id = ? AND user_id = ?
+        """,
+        [answer_string, total_time, progress_index, "未完成", test_id, userinfo['id']]
+    )
+
+    return jsonify({
+        'success': True,
+        'test_id': test_id,
+        'progress_index': progress_index
+    })
 
 @ts.route('/SDS/submit', methods=["GET", "POST"])
 def SDS_submit():
-    test_id = session.get("test_id")
+    userinfo = session.get("userinfo")
+    if not userinfo:
+        return jsonify({'success': False, 'error': '未登录'}), 401
+
+    test_id = _ensure_active_test_id(userinfo['id'], session.get("test_id"))
+    session["test_id"] = test_id
 
     # 获取前端发送的数据
-    data = request.get_json()
-    answers = data.get('answers')
-    total_time = data.get('totalTime')
+    data = request.get_json(silent=True) or {}
+    answers = data.get('answers') or {}
+    total_time = max(0, int(data.get('totalTime') or 0))
     finish_time = get_beijing_time()
+    progress_index = _clamp_progress_index(data.get('currentQuestionIndex', 19))
 
     # 转为字符串答案answer
-    answer = []
-    for i in range(1, 21):
-        key = str(i)
-        if key in answers:
-            answer.append(str(answers[key]['value']))
-        else:
-            answer.append('0')
-    answer = ''.join(answer)
+    answer = _answers_payload_to_choice_string(answers)
 
     # 计算分值和抑郁程度
     # 反向评分题题号（2,5,6,11,12,14,16,17,18,20）
@@ -89,7 +222,9 @@ def SDS_submit():
     for i in range(1, 21):
         key = str(i)
         if key in answers:
-            value = answers[key]['value']
+            answer_data = answers.get(key) or answers.get(i)
+            value = answer_data['value'] if isinstance(answer_data, dict) else answer_data
+            value = int(value)
             # 检查是否为反向评分题
             if i in reverse_questions:
                 # 反向评分：4->1, 3->2, 2->3, 1->4
@@ -117,8 +252,11 @@ def SDS_submit():
 
     finish_status = "未完成" if '0' in answer else "已完成"
 
-    db.update("UPDATE test SET finish_time = ?, use_time = ?, status = ?, result = ?, choose = ?, score = ? WHERE id = ?",
-              [finish_time, total_time, finish_status, anxiety_level, answer, standard_score, test_id])
+    db.update(
+        "UPDATE test SET finish_time = ?, use_time = ?, progress_index = ?, status = ?, result = ?, choose = ?, score = ? WHERE id = ?",
+        [finish_time, total_time, progress_index, finish_status, anxiety_level, answer, standard_score, test_id]
+    )
+    session.pop("test_id", None)
 
     return jsonify({
         'success': True,
