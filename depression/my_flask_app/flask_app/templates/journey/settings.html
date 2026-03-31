@@ -1,0 +1,64 @@
+{% extends "journey/base.html" %}
+
+{% block title %}系统设置{% endblock %}
+
+{% block content %}
+<form method="post" class="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
+    <section class="glass-panel rounded-[30px] p-6 space-y-5">
+        <label class="flex items-center justify-between rounded-[24px] field-shell px-4 py-4">
+            <div>
+                <div class="font-medium">语音播报</div>
+                <div class="mt-1 text-sm text-[var(--muted)]">用于虚拟医生结果反馈和后续调节提示。</div>
+            </div>
+            <input type="checkbox" class="h-5 w-5 accent-[var(--teal)]" name="voice_broadcast" {% if current_settings.voice_broadcast %}checked{% endif %}>
+        </label>
+        <label class="flex items-center justify-between rounded-[24px] field-shell px-4 py-4">
+            <div>
+                <div class="font-medium">语音采集</div>
+                <div class="mt-1 text-sm text-[var(--muted)]">允许浏览器语音输入或后端 ASR 接口接入。</div>
+            </div>
+            <input type="checkbox" class="h-5 w-5 accent-[var(--teal)]" name="capture_audio" {% if current_settings.capture_audio %}checked{% endif %}>
+        </label>
+        <label class="flex items-center justify-between rounded-[24px] field-shell px-4 py-4">
+            <div>
+                <div class="font-medium">摄像头 / 表情采集</div>
+                <div class="mt-1 text-sm text-[var(--muted)]">作为辅助特征链，不阻断主流程。</div>
+            </div>
+            <input type="checkbox" class="h-5 w-5 accent-[var(--teal)]" name="capture_camera" {% if current_settings.capture_camera %}checked{% endif %}>
+        </label>
+        <label class="flex items-center justify-between rounded-[24px] field-shell px-4 py-4">
+            <div>
+                <div class="font-medium">EEG 采集</div>
+                <div class="mt-1 text-sm text-[var(--muted)]">用于问诊阶段的实时辅助状态层。</div>
+            </div>
+            <input type="checkbox" class="h-5 w-5 accent-[var(--teal)]" name="capture_eeg" {% if current_settings.capture_eeg %}checked{% endif %}>
+        </label>
+        <label class="flex items-center justify-between rounded-[24px] field-shell px-4 py-4">
+            <div>
+                <div class="font-medium">隐私授权确认</div>
+                <div class="mt-1 text-sm text-[var(--muted)]">记录用户是否允许系统保存多模态摘要和闭环历史。</div>
+            </div>
+            <input type="checkbox" class="h-5 w-5 accent-[var(--teal)]" name="privacy_ack" {% if current_settings.privacy_ack %}checked{% endif %}>
+        </label>
+        <label class="flex items-center justify-between rounded-[24px] field-shell px-4 py-4">
+            <div>
+                <div class="font-medium">调试接口</div>
+                <div class="mt-1 text-sm text-[var(--muted)]">用于 EEG、数字人和外部调控接口联调。</div>
+            </div>
+            <input type="checkbox" class="h-5 w-5 accent-[var(--teal)]" name="debug_mode" {% if current_settings.debug_mode %}checked{% endif %}>
+        </label>
+        <button class="btn-primary rounded-full px-6 py-3 font-medium" type="submit">保存系统设置</button>
+    </section>
+
+    <aside class="space-y-6">
+        <section class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">设计说明</div>
+            <div class="mt-4 space-y-3 text-sm leading-7 text-[var(--muted)]">
+                <p>设置页被单独放到“支撑与管理层”，避免在主流程里把用户打断。</p>
+                <p>多模态权限在这里集中管理，问诊页只负责读取状态并展示当前采集是否开启。</p>
+                <p>后续如果你要增加本地数字人、EEG LSL、外部推荐 API，都可以先从这里做开关控制。</p>
+            </div>
+        </section>
+    </aside>
+</form>
+{% endblock %}

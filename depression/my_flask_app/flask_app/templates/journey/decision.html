@@ -1,0 +1,87 @@
+{% extends "journey/base.html" %}
+
+{% block title %}个性化调控决策{% endblock %}
+
+{% block content %}
+<div class="grid gap-6 xl:grid-cols-[1.06fr_0.94fr]">
+    <form method="post" class="space-y-6">
+        <section class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">当前决策逻辑</div>
+            <h2 class="mt-3 text-3xl">{{ preview.plan_title }}</h2>
+            <p class="mt-4 text-sm leading-8 text-[var(--muted)]">{{ preview.summary }}</p>
+            <div class="mt-5 flex flex-wrap gap-3 text-sm">
+                <span class="chip rounded-full px-4 py-2">风险层级：{{ preview.risk_level }}</span>
+                <span class="chip rounded-full px-4 py-2">规则引擎：{{ preview.engine_name }}</span>
+                <span class="chip rounded-full px-4 py-2">多模态开启：{{ preview.multimodal_open|join(' / ') if preview.multimodal_open else '无' }}</span>
+            </div>
+        </section>
+
+        <section class="glass-panel rounded-[30px] p-6 space-y-5">
+            <label class="block space-y-2">
+                <span class="text-sm font-medium">方案标题</span>
+                <input class="field-shell w-full rounded-2xl px-4 py-3" name="plan_title" value="{{ preview.plan_title }}">
+            </label>
+
+            <label class="block space-y-2">
+                <span class="text-sm font-medium">方案摘要</span>
+                <textarea class="field-shell min-h-[120px] w-full rounded-[24px] px-4 py-3" name="plan_summary">{{ preview.summary }}</textarea>
+            </label>
+
+            <label class="block space-y-2">
+                <span class="text-sm font-medium">执行模式</span>
+                <select class="field-shell w-full rounded-2xl px-4 py-3" name="execution_mode">
+                    {% for mode in preview.available_modes %}
+                    <option value="{{ mode.key }}" {% if mode.key == preview.execution_mode %}selected{% endif %}>{{ mode.label }} · {{ mode.summary }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="block space-y-2">
+                <span class="text-sm font-medium">决策引擎</span>
+                <select class="field-shell w-full rounded-2xl px-4 py-3" name="engine_name">
+                    <option value="rule-engine-placeholder">规则引擎占位（当前）</option>
+                    <option value="local-llm-placeholder">本地 LLM 占位</option>
+                    <option value="remote-api-placeholder">远端 API 占位</option>
+                </select>
+            </label>
+
+            <div class="flex flex-wrap gap-3">
+                <button class="btn-primary rounded-full px-6 py-3 font-medium" type="submit">确认并生成调控方案</button>
+                <a href="{{ url_for('care_flow.result_analysis') }}" class="btn-secondary rounded-full px-6 py-3 font-medium">回到结果分析</a>
+            </div>
+        </section>
+    </form>
+
+    <section class="space-y-6">
+        <div class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">决策依据</div>
+            <div class="mt-4 space-y-3">
+                {% for line in preview.screening_highlights %}
+                <div class="chip rounded-2xl px-4 py-3 text-sm">{{ line }}</div>
+                {% else %}
+                <div class="chip rounded-2xl px-4 py-3 text-sm">当前没有高亮条目，系统将以整体分层为主生成轻量建议。</div>
+                {% endfor %}
+            </div>
+            {% if preview.profile_focus %}
+            <div class="mt-5 rounded-[24px] bg-white/70 border border-[var(--border)] p-4">
+                <div class="text-sm font-medium">来自建档页的关注重点</div>
+                <p class="mt-2 text-sm leading-7 text-[var(--muted)]">{{ preview.profile_focus }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">推荐动作</div>
+            <div class="mt-4 space-y-3">
+                {% for item in preview.recommendations %}
+                <div class="rounded-[24px] bg-white/70 border border-[var(--border)] p-4">
+                    <div class="font-medium">{{ item.title }}</div>
+                    <p class="mt-2 text-sm leading-7 text-[var(--muted)]">{{ item.detail }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

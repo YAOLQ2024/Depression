@@ -1,14 +1,23 @@
 from flask import Blueprint, session, render_template, request, redirect, jsonify, Response
 import datetime
 import json
-import cv2
-import numpy as np
 import time
+
+import numpy as np
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
 
 from utils import db
 # 使用Dolphin ASR语音识别服务
-from utils.speech_recognition_dolphin import dolphin_speech_service as speech_service
-print("使用Dolphin ASR语音识别服务")
+try:
+    from utils.speech_recognition_dolphin import dolphin_speech_service as speech_service
+    print("使用Dolphin ASR语音识别服务")
+except Exception as e:
+    print(f"语音识别服务不可用: {e}")
+    speech_service = None
 
 def get_beijing_time():
     """获取北京时间 - 直接使用系统时间（系统已配置为UTC+8）"""
@@ -21,7 +30,7 @@ try:
     # 导入GPU表情识别服务
     from utils.emotion_recognition_gpu import gpu_emotion_service as npu_emotion_service
     print("使用GPU加速的表情识别服务")
-except ImportError as e:
+except Exception as e:
     print(f"表情识别服务不可用: {e}")
     npu_emotion_service = None
 
@@ -29,7 +38,7 @@ except ImportError as e:
 try:
     from utils import simple_mjpeg_stream_gpu as simple_mjpeg_stream
     print("使用GPU版MJPEG视频流服务")
-except ImportError as e:
+except Exception as e:
     print(f"简化版MJPEG视频流服务不可用: {e}")
     simple_mjpeg_stream = None
 
@@ -137,6 +146,9 @@ def process():
     支持音频文件上传和语音识别
     """
     try:
+        if speech_service is None:
+            return jsonify({'error': '语音识别服务不可用'}), 503
+
         # 检查是否有音频文件
         if 'audio' in request.files:
             # 处理音频文件
@@ -211,6 +223,11 @@ def get_speech_status():
     获取语音识别服务状态
     """
     try:
+        if speech_service is None:
+            return jsonify({
+                'status': 'error',
+                'message': '语音识别服务不可用'
+            }), 503
         # 检查模型是否已加载
         if speech_service.model is None:
             try:
@@ -242,6 +259,8 @@ def test_speech_extraction():
     测试语音文本提取功能
     """
     try:
+        if speech_service is None:
+            return jsonify({'error': '语音识别服务不可用'}), 503
         data = request.get_json()
         test_text = data.get('text', '').strip()
         
@@ -414,6 +433,12 @@ def emotion_video_stream():
     前端使用 <img src="/emotion/video_stream"> 即可显示
     """
     if simple_mjpeg_stream is None:
+        if cv2 is None:
+            return Response(
+                'MJPEG Service Unavailable (cv2 not installed)',
+                status=503,
+                mimetype='text/plain',
+            )
         # 服务不可用，返回错误帧
         error_frame = np.zeros((240, 320, 3), dtype=np.uint8)
         cv2.putText(error_frame, "MJPEG Service Unavailable", (10, 120), 
@@ -511,6 +536,10 @@ def eeg_history_data():
         from flask_app.utils.eeg_receiver import get_eeg_receiver
         receiver = get_eeg_receiver()
         all_data = receiver.get_all_channels_data()
+        channel1_history = receiver.get_history_data(channel=1)
+        if isinstance(all_data, dict):
+            all_data['values'] = channel1_history.get('waveform', [])
+            all_data['timestamps'] = channel1_history.get('timestamps', [])
         
         return jsonify({
             'success': True,

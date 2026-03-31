@@ -1,0 +1,85 @@
+{% extends "journey/base.html" %}
+
+{% block title %}选择虚拟医生{% endblock %}
+
+{% block content %}
+<div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+    <form method="post" class="space-y-6">
+        <div class="grid gap-5">
+            {% for doctor in doctors %}
+            <label class="glass-panel block rounded-[30px] p-6 cursor-pointer border-2 {% if preference.doctor_slug == doctor.slug %}border-[var(--teal)]{% else %}border-transparent{% endif %}">
+                <div class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                    <div class="flex items-start gap-4">
+                        <input class="mt-2 h-4 w-4 accent-[var(--teal)]" type="radio" name="doctor_slug" value="{{ doctor.slug }}" {% if (preference.doctor_slug == doctor.slug) or (not preference and loop.first) %}checked{% endif %}>
+                        <div>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <h2 class="text-2xl">{{ doctor.name }}</h2>
+                                <span class="chip rounded-full px-3 py-1 text-xs">{{ doctor.persona }}</span>
+                            </div>
+                            <p class="mt-3 text-sm leading-7 text-[var(--muted)]">{{ doctor.description }}</p>
+                            <div class="mt-4 flex flex-wrap gap-3 text-sm">
+                                <span class="chip rounded-full px-3 py-2">交互风格：{{ doctor.interaction_style }}</span>
+                                <span class="chip rounded-full px-3 py-2">语音气质：{{ doctor.voice_tone }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="rounded-[28px] p-5 text-white lg:max-w-[280px]" style="background: linear-gradient(135deg, {{ doctor.accent }}, #30484a);">
+                        <div class="text-xs uppercase tracking-[0.2em] text-white/70">开场台词</div>
+                        <p class="mt-3 text-sm leading-7 text-white/90">{{ doctor.greeting }}</p>
+                    </div>
+                </div>
+            </label>
+            {% endfor %}
+        </div>
+
+        <div class="glass-panel rounded-[30px] p-6 space-y-5">
+            <div class="grid gap-5 md:grid-cols-2">
+                <label class="space-y-2">
+                    <span class="text-sm font-medium">交互风格偏好</span>
+                    <select class="field-shell w-full rounded-2xl px-4 py-3" name="interaction_style">
+                        {% for option in ['温和陪伴','理性分析','陪伴共情'] %}
+                        <option value="{{ option }}" {% if preference.interaction_style == option %}selected{% endif %}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="flex items-center justify-between rounded-[24px] field-shell px-4 py-4">
+                    <div>
+                        <div class="font-medium">启用语音播报</div>
+                        <div class="mt-1 text-sm text-[var(--muted)]">先保留开关和对外接口，后续可接 TTS 或数字人驱动。</div>
+                    </div>
+                    <input type="checkbox" class="h-5 w-5 accent-[var(--teal)]" name="voice_enabled" {% if preference.voice_enabled != 0 %}checked{% endif %}>
+                </label>
+            </div>
+
+            <div class="flex flex-wrap gap-3">
+                <button class="btn-primary rounded-full px-6 py-3 font-medium" type="submit">保存角色并进入任务首页</button>
+                <a class="btn-secondary rounded-full px-6 py-3 font-medium" href="{{ url_for('care_flow.profile') }}">返回建档修改</a>
+            </div>
+        </div>
+    </form>
+
+    <section class="space-y-6">
+        <div class="glass-panel rounded-[30px] overflow-hidden">
+            <div class="p-6 border-b border-[var(--border)]">
+                <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">数字人播放接口预留</div>
+                <h2 class="mt-3 text-2xl">当前先用视频占位，后续可替换成 AI 生成的视频流。</h2>
+            </div>
+            <div class="p-6">
+                <video class="w-full rounded-[24px] bg-black/70 shadow-lg" controls muted preload="metadata" playsinline>
+                    <source src="{{ preview_doctor.video_url }}" type="video/mp4">
+                </video>
+                <p class="mt-4 text-sm leading-7 text-[var(--muted)]">当前已经预留了 `/api/virtual-doctors` 和 `/api/virtual-doctors/&lt;slug&gt;/playback` 接口。后续只要把视频 URL 换成数字人服务返回的地址，前端结构不用再推倒重来。</p>
+            </div>
+        </div>
+
+        <div class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">设计取舍</div>
+            <div class="mt-4 space-y-3 text-sm leading-7 text-[var(--muted)]">
+                <p>这一步先解决“用户和谁交互”的问题，而不是一上来就进入量表，让整个系统更像一条连续的问诊任务流。</p>
+                <p>医生选择页保留了数字人外接口，但不强依赖数字人实时驱动，从而保证现阶段工程可以稳定推进。</p>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

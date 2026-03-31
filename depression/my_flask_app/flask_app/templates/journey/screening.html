@@ -1,0 +1,512 @@
+{% extends "journey/base.html" %}
+
+{% block title %}结构化量表问诊{% endblock %}
+
+{% block content %}
+{% set ns = namespace(total=0) %}
+{% for scale, prefix in scale_sections %}
+    {% set ns.total = ns.total + (scale["items"]|length) %}
+{% endfor %}
+{% set total_questions = ns.total %}
+
+<style>
+    .screen-progress-track {
+        background: rgba(226, 232, 240, 0.72);
+    }
+
+    .screen-progress-bar {
+        background: linear-gradient(90deg, #60A5FA, #4F46E5);
+        box-shadow: 0 0 16px rgba(79, 70, 229, 0.22);
+    }
+
+    .screen-question-card {
+        background: rgba(255, 255, 255, 0.76);
+        border: 1px solid rgba(229, 232, 239, 0.9);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+    }
+
+    .screen-index-pill {
+        background: linear-gradient(135deg, rgba(232, 243, 255, 0.95), rgba(219, 234, 254, 0.88));
+        color: #165DFF;
+    }
+
+    .screen-option-card {
+        border: 1px solid #E5E8EF;
+        background: rgba(249, 250, 251, 0.96);
+        transition: all 0.18s ease;
+    }
+
+    .screen-option-card:hover {
+        border-color: rgba(59, 130, 246, 0.32);
+        background: rgba(239, 246, 255, 0.88);
+        transform: translateY(-1px);
+    }
+
+    .screen-option-card.is-selected {
+        border-color: rgba(59, 130, 246, 0.45);
+        background: linear-gradient(135deg, rgba(232, 243, 255, 0.98), rgba(219, 234, 254, 0.92));
+        box-shadow: 0 12px 24px -18px rgba(59, 130, 246, 0.55);
+    }
+
+    .monitor-shell {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.86));
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 8px 28px -10px rgba(148, 163, 184, 0.15);
+    }
+
+    .monitor-channel {
+        background: rgba(255, 255, 255, 0.62);
+        border: 1px solid rgba(226, 232, 240, 0.95);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+    }
+
+    .monitor-canvas-shell {
+        background: rgba(248, 250, 252, 0.94);
+        border: 1px solid rgba(226, 232, 240, 0.95);
+        box-shadow: inset 0 2px 10px rgba(148, 163, 184, 0.10);
+    }
+
+    .answer-grid-pill {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        aspect-ratio: 1 / 1;
+        border-radius: 0.8rem;
+        border: 2px solid #E2E8F0;
+        background: rgba(255, 255, 255, 0.68);
+        color: #94A3B8;
+        font-size: 0.72rem;
+        font-weight: 700;
+        transition: all 0.18s ease;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .answer-grid-pill:hover {
+        border-color: rgba(59, 130, 246, 0.35);
+        background: rgba(239, 246, 255, 0.88);
+        color: #2563EB;
+    }
+
+    .answer-grid-pill.is-answered {
+        background: linear-gradient(135deg, #3B82F6, #2563EB);
+        border-color: #2563EB;
+        color: white;
+        box-shadow: 0 10px 18px -12px rgba(37, 99, 235, 0.75);
+    }
+
+    .answer-grid-pill.is-current {
+        transform: scale(1.04);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+    }
+
+    .signal-tag-on {
+        color: #14B8A6;
+        background: rgba(236, 253, 245, 0.88);
+        border-color: rgba(20, 184, 166, 0.18);
+    }
+
+    .signal-tag-off {
+        color: #64748B;
+        background: rgba(248, 250, 252, 0.9);
+        border-color: rgba(226, 232, 240, 0.92);
+    }
+</style>
+
+<form method="post" class="space-y-6">
+    <input type="hidden" name="started_at" value="{{ started_at }}">
+
+    <section class="glass-panel rounded-[28px] p-6 md:p-7">
+        <div class="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            <div class="flex items-center gap-4">
+                <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md">
+                    <i class="fa-solid fa-clipboard-check"></i>
+                </div>
+                <div>
+                    <div class="text-sm font-semibold text-slate-800">结构化量表问诊</div>
+                    <div class="mt-1 text-xs uppercase tracking-[0.24em] text-[var(--muted-soft)]">Assessment In Progress</div>
+                </div>
+            </div>
+
+            <div class="flex-1 xl:max-w-2xl">
+                <div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-500">
+                    <span>作答进度</span>
+                    <span id="progressText" class="font-mono text-blue-600">0 / {{ total_questions }}</span>
+                </div>
+                <div class="screen-progress-track h-2 overflow-hidden rounded-full">
+                    <div id="progressBar" class="screen-progress-bar h-full rounded-full transition-all duration-500" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <span class="chip rounded-full px-4 py-2 text-sm">PHQ-9 + GAD-7</span>
+                <span class="chip rounded-full px-4 py-2 text-sm">共 {{ total_questions }} 题</span>
+            </div>
+        </div>
+    </section>
+
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,1.22fr)_420px]">
+        <section class="space-y-6">
+            {% for scale, prefix in scale_sections %}
+            <div class="glass-panel rounded-[28px] p-6 sm:p-7">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted-soft)]">{{ scale.short_name }}</div>
+                        <h2 class="mt-2 text-3xl font-semibold text-slate-800">{{ scale.name }}</h2>
+                        <p class="mt-3 max-w-3xl text-sm leading-7 text-[var(--muted)]">{{ scale.intro }}</p>
+                    </div>
+                    <div class="chip rounded-full px-4 py-2 text-sm">{{ scale["items"]|length }} 项</div>
+                </div>
+
+                <div class="mt-6 space-y-4">
+                    {% for item in scale["items"] %}
+                    <section class="screen-question-card rounded-[24px] p-5 sm:p-6" data-question-name="{{ prefix }}_{{ item.id }}">
+                        <div class="flex gap-4">
+                            <div class="screen-index-pill h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center text-lg font-semibold">{{ item.index }}</div>
+                            <div class="min-w-0 flex-1">
+                                <h3 class="text-xl font-medium leading-8 text-slate-800">{{ item.text }}</h3>
+                                <div class="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+                                    {% for option in scale["options"] %}
+                                    <label class="block cursor-pointer">
+                                        <input class="sr-only scale-answer" type="radio" name="{{ prefix }}_{{ item.id }}" value="{{ option.value }}">
+                                        <div class="screen-option-card answer-card rounded-[18px] px-4 py-3">
+                                            <div class="flex items-center justify-between gap-3">
+                                                <span class="font-medium text-sm text-slate-800">{{ option.label }}</span>
+                                                <span class="text-xs text-[var(--muted)]">{{ option.value }} 分</span>
+                                            </div>
+                                            <p class="mt-2 text-xs leading-6 text-[var(--muted)]">{{ option.description }}</p>
+                                        </div>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+
+        <aside class="space-y-6 xl:sticky xl:top-6 xl:self-start">
+            <section class="glass-panel rounded-[28px] p-5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="p-1.5 rounded-lg bg-blue-50 text-blue-500">
+                            <i class="fa-solid fa-wave-square text-xs"></i>
+                        </div>
+                        <span class="text-xs font-bold text-slate-600">Multi-Modal Assist</span>
+                    </div>
+                    <span class="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 font-mono">Live</span>
+                </div>
+
+                <div class="mt-4 space-y-3">
+                    <div class="flex items-center justify-between rounded-2xl border px-4 py-3 {% if settings.capture_audio %}signal-tag-on{% else %}signal-tag-off{% endif %}">
+                        <span class="text-sm font-medium">语音输入</span>
+                        <span class="text-xs">{{ '已启用' if settings.capture_audio else '未启用' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-2xl border px-4 py-3 {% if settings.capture_camera %}signal-tag-on{% else %}signal-tag-off{% endif %}">
+                        <span class="text-sm font-medium">表情采集</span>
+                        <span class="text-xs">{{ '已启用' if settings.capture_camera else '未启用' }}</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-2xl border px-4 py-3 {% if settings.capture_eeg %}signal-tag-on{% else %}signal-tag-off{% endif %}">
+                        <span class="text-sm font-medium">EEG 采集</span>
+                        <span class="text-xs">{{ '已启用' if settings.capture_eeg else '未启用' }}</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="monitor-shell rounded-[24px] p-5">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="p-1.5 rounded-lg bg-indigo-50 text-indigo-500">
+                            <i class="fa-solid fa-bolt text-xs"></i>
+                        </div>
+                        <span class="text-xs font-bold text-slate-600">Multi-Channel EEG</span>
+                    </div>
+                    <span id="eegStatusBadge" class="text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono">Waiting</span>
+                </div>
+
+                <div class="space-y-2">
+                    {% for label, canvas_id in [('FP1', 'journeyEeg1'), ('FP2', 'journeyEeg2'), ('CZ', 'journeyEeg3')] %}
+                    <div class="monitor-channel w-full rounded-xl overflow-hidden relative" style="height: 90px;">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">{{ label }}</div>
+                        <div class="monitor-canvas-shell h-full w-full">
+                            <canvas id="{{ canvas_id }}" class="w-full h-full"></canvas>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div id="eegScaleInfo" class="mt-3 text-[11px] text-slate-400 font-mono">自动刻度：等待波形数据...</div>
+
+                <div class="mt-4 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-3">
+                    <div class="text-sm font-semibold text-blue-700">状态提示</div>
+                    <div id="eegLabel" class="mt-1 text-sm text-blue-600">尚未收到 EEG 分类结果。</div>
+                    <div id="eegSourceNote" class="mt-2 text-xs text-slate-500">等待局域网 EEG 流连接。</div>
+                </div>
+            </section>
+
+            <section class="glass-panel rounded-[24px] p-5">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-2">
+                        <div class="p-1.5 rounded-lg bg-blue-50 text-blue-500">
+                            <i class="fa-solid fa-table-cells-large text-xs"></i>
+                        </div>
+                        <span class="text-xs font-bold text-slate-600">答题卡</span>
+                    </div>
+                    <span id="answerCountBadge" class="text-[10px] text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100 font-mono">0 / {{ total_questions }}</span>
+                </div>
+
+                <div id="answerGrid" class="grid grid-cols-4 gap-2"></div>
+
+                <div class="mt-5 rounded-2xl bg-slate-50/90 border border-slate-200 px-4 py-4">
+                    <div class="text-sm text-slate-500">已完成</div>
+                    <div class="mt-1 text-3xl font-semibold text-slate-800"><span id="answerCount">0</span><span class="text-lg text-slate-400"> / {{ total_questions }}</span></div>
+                    <div class="mt-2 text-sm text-slate-500">多模态采集不会阻断量表提交流程。</div>
+                </div>
+
+                <button class="btn-primary mt-5 w-full rounded-full px-6 py-3 font-medium" type="submit">提交量表并进入结果分析</button>
+                <a href="{{ url_for('care_flow.task_home') }}" class="btn-secondary mt-3 w-full rounded-full px-6 py-3 text-center font-medium">稍后返回任务首页</a>
+            </section>
+        </aside>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const answerInputs = Array.from(document.querySelectorAll('.scale-answer'));
+    const answerCountEl = document.getElementById('answerCount');
+    const answerCountBadge = document.getElementById('answerCountBadge');
+    const progressText = document.getElementById('progressText');
+    const progressBar = document.getElementById('progressBar');
+    const answerGrid = document.getElementById('answerGrid');
+    const eegStatusBadge = document.getElementById('eegStatusBadge');
+    const eegLabel = document.getElementById('eegLabel');
+    const eegSourceNote = document.getElementById('eegSourceNote');
+    const eegScaleInfo = document.getElementById('eegScaleInfo');
+
+    const questionOrder = [...new Set(answerInputs.map((input) => input.name))];
+    let activeQuestionName = questionOrder[0] || null;
+
+    function renderAnswerGrid() {
+        answerGrid.innerHTML = questionOrder.map((name, index) => (
+            `<button class="answer-grid-pill" type="button" data-name="${name}" title="第 ${index + 1} 题">${index + 1}</button>`
+        )).join('');
+    }
+
+    function scrollToQuestion(name) {
+        const target = document.querySelector(`[data-question-name="${name}"]`);
+        if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }
+
+    function updateAnswerStyles() {
+        answerInputs.forEach((input) => {
+            const card = input.closest('label')?.querySelector('.answer-card');
+            if (!card) return;
+            card.classList.toggle('is-selected', input.checked);
+        });
+    }
+
+    function updateAnswerGrid(answeredNames) {
+        const cells = Array.from(answerGrid.querySelectorAll('.answer-grid-pill'));
+        cells.forEach((cell) => {
+            const name = cell.dataset.name;
+            cell.classList.toggle('is-answered', answeredNames.has(name));
+            cell.classList.toggle('is-current', name === activeQuestionName);
+        });
+    }
+
+    function countAnswered() {
+        const answeredNames = new Set(answerInputs.filter((input) => input.checked).map((input) => input.name));
+        const answered = answeredNames.size;
+        answerCountEl.textContent = String(answered);
+        answerCountBadge.textContent = `${answered} / ${questionOrder.length}`;
+        progressText.textContent = `${answered} / ${questionOrder.length}`;
+        progressBar.style.width = `${questionOrder.length ? (answered / questionOrder.length) * 100 : 0}%`;
+        updateAnswerStyles();
+        updateAnswerGrid(answeredNames);
+    }
+
+    renderAnswerGrid();
+    answerGrid.addEventListener('click', (event) => {
+        const cell = event.target.closest('.answer-grid-pill');
+        if (!cell) return;
+        activeQuestionName = cell.dataset.name;
+        countAnswered();
+        scrollToQuestion(activeQuestionName);
+    });
+
+    answerInputs.forEach((input) => {
+        input.addEventListener('change', () => {
+            activeQuestionName = input.name;
+            countAnswered();
+        });
+    });
+    countAnswered();
+
+    const canvases = [
+        document.getElementById('journeyEeg1'),
+        document.getElementById('journeyEeg2'),
+        document.getElementById('journeyEeg3'),
+    ];
+    const colors = ['#6366F1', '#3B82F6', '#8B5CF6'];
+    const labels = ['FP1', 'FP2', 'CZ'];
+    const waveforms = [[], [], []];
+    const scaleSummaries = ['--', '--', '--'];
+    const maxPoints = 200;
+
+    function formatScaleValue(value) {
+        if (!Number.isFinite(value)) return '--';
+        if (Math.abs(value) >= 100) return value.toFixed(0);
+        if (Math.abs(value) >= 10) return value.toFixed(1);
+        return value.toFixed(2);
+    }
+
+    function getWaveStats(values) {
+        const finiteValues = values.filter((value) => Number.isFinite(value));
+        if (!finiteValues.length) {
+            return { baseline: 0, amplitude: 1 };
+        }
+
+        const baseline = finiteValues.reduce((sum, value) => sum + value, 0) / finiteValues.length;
+        const deviations = finiteValues.map((value) => Math.abs(value - baseline));
+        const meanDeviation = deviations.reduce((sum, value) => sum + value, 0) / deviations.length;
+        const peakDeviation = deviations.reduce((max, value) => Math.max(max, value), 0);
+        const amplitude = Math.max(Math.min(peakDeviation, Math.max(meanDeviation * 6, 0.05)), 0.05);
+
+        return { baseline, amplitude };
+    }
+
+    function resizeCanvases() {
+        canvases.forEach((canvas) => {
+            if (!canvas || !canvas.parentElement) return;
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        });
+    }
+
+    function drawWave(index) {
+        const canvas = canvases[index];
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.32)';
+        ctx.moveTo(0, height / 2);
+        ctx.lineTo(width, height / 2);
+        ctx.stroke();
+
+        const data = waveforms[index];
+        if (!data.length) {
+            ctx.fillStyle = '#94A3B8';
+            ctx.font = '12px "Noto Sans SC"';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${labels[index]} 等待数据`, width / 2, height / 2 + 4);
+            scaleSummaries[index] = `${labels[index]} ±--`;
+            return;
+        }
+
+        ctx.beginPath();
+        ctx.strokeStyle = colors[index];
+        ctx.lineWidth = 2;
+        const pointSpacing = width / Math.max(data.length - 1, 1);
+        const { baseline, amplitude } = getWaveStats(data);
+        const verticalLimit = height * 0.38;
+        const pixelsPerUnit = verticalLimit / amplitude;
+        data.forEach((point, i) => {
+            const x = i * pointSpacing;
+            const centered = point - baseline;
+            const yOffset = Math.max(-verticalLimit, Math.min(verticalLimit, centered * pixelsPerUnit));
+            const y = height / 2 - yOffset;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+
+        ctx.lineTo(width, height);
+        ctx.lineTo(0, height);
+        ctx.closePath();
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, `${colors[index]}33`);
+        gradient.addColorStop(1, `${colors[index]}00`);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        scaleSummaries[index] = `${labels[index]} ±${formatScaleValue(amplitude)}`;
+    }
+
+    function drawAllWaves() {
+        [0, 1, 2].forEach(drawWave);
+        eegScaleInfo.textContent = `自动刻度：${scaleSummaries.join(' | ')}`;
+        requestAnimationFrame(drawAllWaves);
+    }
+
+    function setBadgeState(connected, hasError) {
+        if (hasError) {
+            eegStatusBadge.textContent = 'Error';
+            eegStatusBadge.className = 'text-[10px] text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100 font-mono';
+            return;
+        }
+        eegStatusBadge.textContent = connected ? 'Stable' : 'Waiting';
+        eegStatusBadge.className = connected
+            ? 'text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100 font-mono'
+            : 'text-[10px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono';
+    }
+
+    async function fetchEegData() {
+        try {
+            const response = await fetch('/eeg/channels');
+            const payload = await response.json();
+            if (payload.success && payload.data) {
+                ['channel1', 'channel2', 'channel3'].forEach((key, index) => {
+                    const waveform = payload.data[key]?.waveform || [];
+                    waveforms[index] = waveform.slice(-maxPoints);
+                });
+                const source = payload.data.source || {};
+                setBadgeState(Boolean(source.connected), false);
+                eegSourceNote.textContent = source.connected
+                    ? 'EEG 原始波形已接入前端监测面板。'
+                    : (source.last_error || '等待局域网 EEG 流连接。');
+                return;
+            }
+            setBadgeState(false, true);
+            eegSourceNote.textContent = payload.error || 'EEG 接口返回异常。';
+        } catch (error) {
+            setBadgeState(false, true);
+            eegSourceNote.textContent = 'EEG 接口暂时不可用。';
+        }
+    }
+
+    async function fetchEegClassification() {
+        try {
+            const response = await fetch('/eeg/classification');
+            const payload = await response.json();
+            if (payload.success && payload.data) {
+                const label = payload.data.label || 'standby';
+                const reason = payload.data.reason || 'ok';
+                eegLabel.textContent = `当前分类：${label}；原因：${reason}`;
+                return;
+            }
+            eegLabel.textContent = '分类接口暂不可用。';
+        } catch (error) {
+            eegLabel.textContent = '分类接口暂不可用。';
+        }
+    }
+
+    resizeCanvases();
+    window.addEventListener('resize', resizeCanvases);
+    drawAllWaves();
+    fetchEegData();
+    fetchEegClassification();
+    setInterval(fetchEegData, 150);
+    setInterval(fetchEegClassification, 1200);
+});
+</script>
+{% endblock %}

@@ -107,54 +107,7 @@ def resolve_status_level(label):
 
 @mi.route('/main', methods=["GET"])
 def main():
-    # 读取cookies
-    userinfo = session.get("userinfo")
-
-    role = userinfo['role']
-    if role == 2:
-        test_list = db.fetch_all("select * from test", [])
-    else:
-        test_list = db.fetch_all("select * from test where user_id=?", [userinfo['id']])
-
-    # 过滤掉result为None的数据
-    filtered_list  = [item for item in test_list if item.get('result') is not None]
-    sorted_list = sorted(filtered_list , key=lambda x: x['finish_time'], reverse=True)
-
-    if len(sorted_list) == 0:
-        status = "未测评"
-        count_inmonth = 0
-        delta = 0
-        latest_comprehensive_score = None
-        latest_finish_time = None
-    else:
-        current_time = get_beijing_time()
-        last_month = current_time - datetime.timedelta(days=30)
-
-        # 转换finish_time为datetime对象进行比较
-        count_inmonth = sum(1 for item in sorted_list if parse_datetime(item['finish_time']) >= last_month)
-
-        latest_time = parse_datetime(sorted_list[0]['finish_time'])
-
-        delta = (current_time - latest_time).days if (current_time - latest_time).days >= 0 else 0
-
-        status = sorted_list[0]["result"]
-        
-        # 计算最新测评的综合评分：SDS分数*50% + 表情分数(65)*30% + 脑电分数(60)*20%
-        latest_test = sorted_list[0]
-        sds_score = latest_test.get('score', 0) or 0
-        facial_score = 65  # 默认表情分数
-        eeg_score = 60    # 默认脑电分数
-        latest_comprehensive_score = int(round(sds_score * 0.5 + facial_score * 0.3 + eeg_score * 0.2))
-        latest_finish_time = latest_test.get('finish_time', '')
-
-    return render_template("main2.html", 
-                         status=status, 
-                         count_inmonth=count_inmonth, 
-                         delta=delta, 
-                         userinfo=userinfo, 
-                         sorted_list=sorted_list,
-                         latest_comprehensive_score=latest_comprehensive_score,
-                         latest_finish_time=latest_finish_time)
+    return redirect('/journey/entry')
 
 
 @mi.route('/history/debug', methods=["GET"])
@@ -539,5 +492,4 @@ def get_report_details(record_id):
 @mi.route('/logout', methods=["GET", "POST"])
 def logout():
     session.clear()
-
-    return '1'
+    return redirect('/login')

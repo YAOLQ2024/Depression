@@ -10,12 +10,39 @@ import os
 import signal
 import time
 import socket
+import ctypes
 import psutil
 from pathlib import Path
 
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'my_flask_app'))
+
+
+def preload_runtime_libraries():
+    """优先预加载当前 Conda 环境里的 C++ 运行库，避免 ONNX Runtime 抢占系统旧版 libstdc++。"""
+    env_prefix = Path(sys.executable).resolve().parent.parent
+    lib_dir = env_prefix / "lib"
+    candidates = [
+        lib_dir / "libstdc++.so.6",
+        lib_dir / "libgcc_s.so.1",
+        lib_dir / "libpugixml.so.1",
+    ]
+
+    loaded = []
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            ctypes.CDLL(str(candidate), mode=ctypes.RTLD_GLOBAL)
+            loaded.append(candidate.name)
+        except OSError as exc:
+            print(f"⚠ 预加载运行库失败 {candidate.name}: {exc}")
+
+    if loaded:
+        print(f"✓ 已预加载运行库: {', '.join(loaded)}")
+    else:
+        print("⚠ 未找到可预加载的运行库，后续如遇 LSL/ONNX 兼容问题请检查当前 Python 环境")
 
 def signal_handler(signum, frame):
     """信号处理器"""
@@ -207,10 +234,13 @@ def main():
     print("=" * 80)
     print("抑郁症评估系统 - NVIDIA GPU版本")
     print("=" * 80)
+    print(f"Python解释器: {sys.executable}")
     
     # 注册信号处理器
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+
+    preload_runtime_libraries()
     
     # 获取系统信息
     print("\n系统信息:")

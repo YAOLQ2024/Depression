@@ -27,7 +27,7 @@ def login():
     if userinfo:
         session["userinfo"] = userinfo
         # 登录成功 + 跳转
-        return redirect('/main')
+        return redirect('/journey/entry')
 
     return render_template("login2.html", error="账户或密码错误")
 

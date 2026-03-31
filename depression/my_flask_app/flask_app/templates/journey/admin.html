@@ -1,0 +1,51 @@
+{% extends "journey/base.html" %}
+
+{% block title %}研究后台{% endblock %}
+
+{% block content %}
+<div class="grid gap-6">
+    <section class="grid gap-6 md:grid-cols-4">
+        <div class="glass-panel rounded-[28px] p-5"><div class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">用户数</div><div class="mt-3 text-4xl serif">{{ snapshot.users|length }}</div></div>
+        <div class="glass-panel rounded-[28px] p-5"><div class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">量表记录</div><div class="mt-3 text-4xl serif">{{ snapshot.scale_records|length }}</div></div>
+        <div class="glass-panel rounded-[28px] p-5"><div class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">调控方案</div><div class="mt-3 text-4xl serif">{{ snapshot.plans|length }}</div></div>
+        <div class="glass-panel rounded-[28px] p-5"><div class="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">执行反馈</div><div class="mt-3 text-4xl serif">{{ snapshot.executions|length }}</div></div>
+    </section>
+
+    <section class="grid gap-6 xl:grid-cols-3">
+        <div class="glass-panel rounded-[30px] p-6">
+            <h2 class="text-2xl">最近用户</h2>
+            <div class="mt-4 space-y-3">
+                {% for item in snapshot.users %}
+                <div class="rounded-[22px] bg-white/70 border border-[var(--border)] p-4 text-sm">
+                    <div class="font-medium">{{ item.name }}</div>
+                    <div class="mt-1 text-[var(--muted)]">手机号：{{ item.mobile }} · 角色：{{ item.role }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="glass-panel rounded-[30px] p-6">
+            <h2 class="text-2xl">最近量表</h2>
+            <div class="mt-4 space-y-3">
+                {% for item in snapshot.scale_records %}
+                <div class="rounded-[22px] bg-white/70 border border-[var(--border)] p-4 text-sm">
+                    <div class="font-medium">{{ item.username }} · {{ item.scale_code }}</div>
+                    <div class="mt-1 text-[var(--muted)]">{{ item.severity_label }} · {{ item.total_score }} 分</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="glass-panel rounded-[30px] p-6">
+            <h2 class="text-2xl">最近调控</h2>
+            <div class="mt-4 space-y-3">
+                {% for item in snapshot.plans %}
+                <div class="rounded-[22px] bg-white/70 border border-[var(--border)] p-4 text-sm">
+                    <div class="font-medium">{{ item.plan_title }}</div>
+                    <div class="mt-1 text-[var(--muted)]">{{ item.risk_level }} · {{ item.execution_mode }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

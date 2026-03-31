@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 # 加载 .env 文件
 # 计算项目根目录（向上三级：flask_app/__init__.py -> flask_app -> my_flask_app -> 项目根目录）
 project_root = Path(__file__).parent.parent.parent
+project_root_str = str(project_root)
+if project_root_str not in sys.path:
+    sys.path.insert(0, project_root_str)
+
 env_path = project_root / '.env'
 load_dotenv(env_path, override=True)
 
@@ -67,6 +71,9 @@ def create_app():
 
     from .views import main
     app.register_blueprint(main.mi)
+
+    from .views import care_flow
+    app.register_blueprint(care_flow.cf)
 
     # 注册心理咨询模块（EmoLLM集成）
     from .views import psychological_counseling

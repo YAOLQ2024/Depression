@@ -1,0 +1,77 @@
+{% extends "journey/base.html" %}
+
+{% block title %}结果分析{% endblock %}
+
+{% block content %}
+<div class="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
+    <section class="space-y-6">
+        <div class="glass-panel rounded-[30px] p-6 sm:p-7">
+            <div class="chip inline-flex rounded-full px-4 py-2 text-sm">风险分层：{{ assessment.risk_label }}</div>
+            <h2 class="mt-4 text-4xl leading-tight">结果不是一个孤立分数，而是一段可以被解释、被承接的状态描述。</h2>
+            <p class="mt-4 text-sm leading-8 text-[var(--muted)]">{{ assessment.doctor_script }}</p>
+        </div>
+
+        <div class="grid gap-6 md:grid-cols-2">
+            {% for record in assessment_records %}
+            <div class="glass-panel rounded-[30px] p-6">
+                <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">{{ record.scale_code }}</div>
+                <div class="mt-4 flex items-end justify-between gap-4">
+                    <div class="text-5xl serif">{{ record.total_score }}</div>
+                    <div class="chip rounded-full px-4 py-2 text-sm">{{ record.severity_label }}</div>
+                </div>
+                <p class="mt-4 text-sm leading-7 text-[var(--muted)]">{{ record.summary }}</p>
+                <div class="mt-4 rounded-[24px] bg-white/65 border border-[var(--border)] p-4">
+                    <div class="text-sm font-medium">推荐动作</div>
+                    <p class="mt-2 text-sm leading-7 text-[var(--muted)]">{{ record.recommended_action }}</p>
+                </div>
+            </div>
+            {% else %}
+            <div class="glass-panel rounded-[30px] p-6 md:col-span-2">
+                <div class="text-sm leading-7 text-[var(--muted)]">当前还没有可展示的量表结果，请先返回量表页完成作答。</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">虚拟医生反馈</div>
+            <div class="mt-4 rounded-[28px] p-5 text-white" style="background: linear-gradient(135deg, {{ selected_doctor.accent if selected_doctor else '#1c7c72' }}, #31484b);">
+                <div class="text-sm opacity-75">{{ selected_doctor.name if selected_doctor else '系统医生' }}</div>
+                <p class="mt-3 text-lg leading-8">
+                    {{ doctor_feedback or assessment.doctor_script }}
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <aside class="space-y-6">
+        <section class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">综合判断</div>
+            <div class="mt-4 text-4xl serif">{{ assessment.combined_score }}</div>
+            <div class="mt-2 text-sm text-[var(--muted)]">PHQ-9 {{ assessment.phq_score }} 分 / GAD-7 {{ assessment.gad_score }} 分</div>
+            <div class="mt-5 space-y-3">
+                <div class="chip rounded-2xl px-4 py-3 text-sm flex items-center justify-between">
+                    <span>抑郁维度</span>
+                    <span>{{ assessment.phq_severity }}</span>
+                </div>
+                <div class="chip rounded-2xl px-4 py-3 text-sm flex items-center justify-between">
+                    <span>焦虑维度</span>
+                    <span>{{ assessment.gad_severity }}</span>
+                </div>
+                <div class="chip rounded-2xl px-4 py-3 text-sm flex items-center justify-between">
+                    <span>第 9 题风险提示</span>
+                    <span>{{ '阳性' if assessment.has_item9_flag else '未触发' }}</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">下一步</div>
+            <p class="mt-4 text-sm leading-7 text-[var(--muted)]">下一步不是自由发散聊天，而是进入可控、可解释的“个性化调控决策页”，把量表结果转成执行方案。</p>
+            <div class="mt-5 flex flex-col gap-3">
+                <a href="{{ url_for('care_flow.decision') }}" class="btn-primary rounded-full px-6 py-3 text-center font-medium">进入个性化调控决策</a>
+                <a href="{{ url_for('care_flow.screening') }}" class="btn-secondary rounded-full px-6 py-3 text-center font-medium">返回量表重新作答</a>
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}

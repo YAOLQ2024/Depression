@@ -1,0 +1,90 @@
+{% extends "journey/base.html" %}
+
+{% block title %}任务入口{% endblock %}
+
+{% block content %}
+<section class="glass-panel rounded-[34px] p-7 sm:p-9">
+    <div class="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
+        <div class="max-w-3xl">
+            <div class="chip inline-flex rounded-full px-4 py-2 text-sm">当前风险状态：{{ assessment.risk_label }}</div>
+            <h2 class="mt-5 text-4xl leading-tight">先跑通“量表问诊 → 风险分层 → 调控建议 → 再评估”这条主链。</h2>
+            <p class="mt-4 text-sm leading-8 text-[var(--muted)]">
+                {% if selected_doctor %}
+                {{ selected_doctor.name }}：{{ selected_doctor.greeting }}
+                {% else %}
+                先选择虚拟医生，再进入你的个性化任务入口。
+                {% endif %}
+            </p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 xl:w-[420px]">
+            <div class="glass-panel rounded-[26px] p-5">
+                <div class="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">PHQ-9 + GAD-7</div>
+                <div class="mt-2 text-3xl serif">{{ assessment.combined_score }}</div>
+                <p class="mt-2 text-sm text-[var(--muted)]">组合分数只用于任务入口上的状态概览，正式解释仍以各量表分级为准。</p>
+            </div>
+            <div class="glass-panel rounded-[26px] p-5">
+                <div class="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">最近调节方案</div>
+                <div class="mt-2 text-lg font-semibold">{{ latest_plan.plan_title if latest_plan else '尚未生成' }}</div>
+                <p class="mt-2 text-sm text-[var(--muted)]">{{ latest_plan.risk_level if latest_plan else '先完成问诊后生成' }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-3">
+    <a href="{{ url_for('care_flow.screening') }}" class="glass-panel rounded-[30px] p-6 hover:-translate-y-0.5 transition-all">
+        <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">主要入口</div>
+        <h3 class="mt-4 text-2xl">开始初筛</h3>
+        <p class="mt-3 text-sm leading-7 text-[var(--muted)]">进入 PHQ-9 与 GAD-7 结构化问诊，同时按设置接入语音、表情和 EEG 等辅助采集。</p>
+    </a>
+    <a href="{{ url_for('care_flow.history') }}" class="glass-panel rounded-[30px] p-6 hover:-translate-y-0.5 transition-all">
+        <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">闭环查看</div>
+        <h3 class="mt-4 text-2xl">查看历史</h3>
+        <p class="mt-3 text-sm leading-7 text-[var(--muted)]">沿时间线回看量表结果、调节方案、执行反馈和咨询摘要，形成连续观察。</p>
+    </a>
+    <a href="{{ url_for('care_flow.decision') }}" class="glass-panel rounded-[30px] p-6 hover:-translate-y-0.5 transition-all">
+        <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">继续任务</div>
+        <h3 class="mt-4 text-2xl">再次评估 / 继续调控</h3>
+        <p class="mt-3 text-sm leading-7 text-[var(--muted)]">如果已经有上一轮结果，可以直接进入个性化调控决策，或重新开始新一轮初筛。</p>
+    </a>
+</div>
+
+<div class="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+    <section class="glass-panel rounded-[30px] p-6">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">最近量表</div>
+                <h3 class="mt-2 text-2xl">结果快照</h3>
+            </div>
+            <a href="{{ url_for('care_flow.screening') }}" class="btn-secondary rounded-full px-4 py-2 text-sm">重新进入问诊</a>
+        </div>
+        <div class="mt-5 grid gap-4 md:grid-cols-2">
+            {% for record in recent_scales %}
+            <div class="rounded-[24px] bg-white/70 border border-[var(--border)] p-5">
+                <div class="flex items-center justify-between gap-3">
+                    <span class="chip rounded-full px-3 py-1 text-xs">{{ record.scale_code }}</span>
+                    <span class="text-xs text-[var(--muted)]">{{ record.completed_at }}</span>
+                </div>
+                <div class="mt-4 text-3xl serif">{{ record.total_score }}</div>
+                <div class="mt-2 text-sm font-medium">{{ record.severity_label }}</div>
+                <p class="mt-3 text-sm leading-7 text-[var(--muted)]">{{ record.summary }}</p>
+            </div>
+            {% else %}
+            <div class="rounded-[24px] bg-white/60 border border-[var(--border)] p-5 text-sm text-[var(--muted)] md:col-span-2">
+                还没有量表记录，先从“开始初筛”进入第一条硬主链。
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="glass-panel rounded-[30px] p-6">
+        <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">任务流原则</div>
+        <div class="mt-5 space-y-4 text-sm leading-7 text-[var(--muted)]">
+            <p>当前版本把自由交谈从主链中移到了支撑层，主流程优先保证结构化量表、结果解释、调控建议和再评估稳定闭环。</p>
+            <p>多模态采集不会阻断主流程。即使相机、麦克风或 EEG 没连接，用户也仍然可以完成 PHQ-9 / GAD-7 问诊。</p>
+            <p>数字人视频和调控引擎都已预留接口，后续可以在不改页面结构的情况下替换为外部服务。</p>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

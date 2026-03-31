@@ -1,0 +1,48 @@
+{% extends "journey/base.html" %}
+
+{% block title %}调节建议{% endblock %}
+
+{% block content %}
+<div class="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
+    <section class="space-y-6">
+        <div class="glass-panel rounded-[30px] p-6">
+            <div class="chip inline-flex rounded-full px-4 py-2 text-sm">风险层级：{{ plan.risk_level }}</div>
+            <h2 class="mt-4 text-4xl leading-tight">{{ plan.plan_title }}</h2>
+            <p class="mt-4 text-sm leading-8 text-[var(--muted)]">{{ plan.plan_summary }}</p>
+        </div>
+
+        <div class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">建议清单</div>
+            <div class="mt-5 grid gap-4">
+                {% for item in plan.recommendations %}
+                <div class="rounded-[24px] bg-white/70 border border-[var(--border)] p-5">
+                    <div class="font-medium">{{ item.title }}</div>
+                    <p class="mt-2 text-sm leading-7 text-[var(--muted)]">{{ item.detail }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <aside class="space-y-6">
+        <section class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">执行方式</div>
+            <div class="mt-4 text-3xl serif">{{ plan.execution_mode }}</div>
+            <p class="mt-3 text-sm leading-7 text-[var(--muted)]">当前先把建议组织成文本解释和视频执行入口。音乐、色彩、绘画等更细调控方式后续可以直接挂在这个页面下。</p>
+            <div class="mt-5 flex flex-col gap-3">
+                <a href="{{ url_for('care_flow.execution', plan_id=plan.id) }}" class="btn-primary rounded-full px-6 py-3 text-center font-medium">进入调节执行页</a>
+                <a href="{{ url_for('care_flow.history') }}" class="btn-secondary rounded-full px-6 py-3 text-center font-medium">先去看历史记录</a>
+            </div>
+        </section>
+
+        <section class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">对外接口</div>
+            <div class="mt-4 space-y-3 text-sm leading-7 text-[var(--muted)]">
+                <p>当前方案记录已经落库，后续只需要把 `media_url`、数字人视频 URL 或外部调控 API 的结果写回这张表，就能复用整套前端执行页。</p>
+                <p>这意味着调控引擎可以晚一点实现，但页面架构、任务流程和数据落点已经先固定下来了。</p>
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}
+

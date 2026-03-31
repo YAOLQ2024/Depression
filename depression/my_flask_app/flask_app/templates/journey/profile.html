@@ -1,0 +1,75 @@
+{% extends "journey/base.html" %}
+
+{% block title %}患者建档{% endblock %}
+
+{% block content %}
+<div class="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+    <form method="post" class="glass-panel rounded-[30px] p-6 sm:p-8 space-y-6">
+        <div class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+                <span class="text-sm font-medium">显示称呼</span>
+                <input class="field-shell w-full rounded-2xl px-4 py-3" type="text" name="display_name" value="{{ profile.display_name or journey_user.name }}" placeholder="例如：小林 / 匿名用户 A">
+            </label>
+            <label class="space-y-2">
+                <span class="text-sm font-medium">年龄段</span>
+                <select class="field-shell w-full rounded-2xl px-4 py-3" name="age_band">
+                    {% for option in ['18岁以下','18-24岁','25-34岁','35-44岁','45-59岁','60岁以上'] %}
+                    <option value="{{ option }}" {% if profile.age_band == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="space-y-2">
+                <span class="text-sm font-medium">性别</span>
+                <select class="field-shell w-full rounded-2xl px-4 py-3" name="gender">
+                    {% for option in ['女','男','不便透露'] %}
+                    <option value="{{ option }}" {% if profile.gender == option %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="space-y-2">
+                <span class="text-sm font-medium">是否首次使用</span>
+                <select class="field-shell w-full rounded-2xl px-4 py-3" name="first_visit">
+                    <option value="yes" {% if profile.first_visit != 0 %}selected{% endif %}>首次使用</option>
+                    <option value="no" {% if profile.first_visit == 0 %}selected{% endif %}>再次进入</option>
+                </select>
+            </label>
+        </div>
+
+        <label class="space-y-2 block">
+            <span class="text-sm font-medium">既往情绪困扰或当前主要背景</span>
+            <textarea class="field-shell min-h-[120px] w-full rounded-[24px] px-4 py-3" name="emotional_history" placeholder="例如：长期睡眠不稳、近期课业压力大、曾有低落期但未系统就诊。">{{ profile.emotional_history or '' }}</textarea>
+        </label>
+
+        <label class="space-y-2 block">
+            <span class="text-sm font-medium">本轮希望系统优先帮助的方向</span>
+            <textarea class="field-shell min-h-[120px] w-full rounded-[24px] px-4 py-3" name="support_focus" placeholder="例如：先看看我最近是不是焦虑偏重；希望后面给我比较清楚的调节建议。">{{ profile.support_focus or '' }}</textarea>
+        </label>
+
+        <div class="flex flex-wrap gap-3 pt-2">
+            <button class="btn-primary rounded-full px-6 py-3 font-medium" type="submit">保存建档并继续</button>
+            <a class="btn-secondary rounded-full px-6 py-3 font-medium" href="{{ url_for('account.userinfo') }}">查看旧个人页</a>
+        </div>
+    </form>
+
+    <section class="space-y-6">
+        <div class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">为什么先建档</div>
+            <h2 class="mt-3 text-2xl">让后面的量表、历史和调节结果都归属于同一个用户上下文。</h2>
+            <div class="mt-5 space-y-4 text-sm leading-7 text-[var(--muted)]">
+                <p>这一步不是普通注册后的补充表单，而是整个任务链的第一层。后续的风险分层、历史记录、个性化调控都会基于这份档案来生成。</p>
+                <p>V1 阶段我们只保留最关键的结构化画像字段，避免在系统一开始把用户信息收集得过重。</p>
+            </div>
+        </div>
+
+        <div class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">任务流预览</div>
+            <div class="mt-4 space-y-3">
+                {% for step in ['01 建档','02 选择虚拟医生','03 进入问诊首页','04 完成 PHQ-9 / GAD-7','05 风险分层与反馈','06 调控决策与执行','07 历史记录与再评估'] %}
+                <div class="chip rounded-2xl px-4 py-3 text-sm">{{ step }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+

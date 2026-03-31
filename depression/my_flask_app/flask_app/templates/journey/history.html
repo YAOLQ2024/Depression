@@ -1,0 +1,72 @@
+{% extends "journey/base.html" %}
+
+{% block title %}历史记录与再评估{% endblock %}
+
+{% block content %}
+<div class="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+    <section class="glass-panel rounded-[30px] p-6">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">闭环时间线</div>
+                <h2 class="mt-3 text-3xl">把评估、调控和反馈看成一条连续轨迹。</h2>
+            </div>
+            <a href="{{ url_for('care_flow.screening') }}" class="btn-primary rounded-full px-5 py-3 text-sm font-medium">开始新一轮评估</a>
+        </div>
+
+        <div class="mt-6 relative pl-6">
+            <div class="timeline-line absolute left-[11px] top-0 h-full w-[2px]"></div>
+            <div class="space-y-6">
+                {% for item in timeline_items %}
+                <article class="relative">
+                    <div class="absolute left-[-23px] top-2 h-4 w-4 rounded-full bg-[var(--teal)]"></div>
+                    <div class="rounded-[24px] bg-white/72 border border-[var(--border)] p-5">
+                        <div class="flex items-center justify-between gap-4">
+                            <div class="font-medium">{{ item.title }}</div>
+                            <div class="text-xs text-[var(--muted)]">{{ item.timestamp }}</div>
+                        </div>
+                        <p class="mt-3 text-sm leading-7 text-[var(--muted)]">{{ item.summary }}</p>
+                        <div class="mt-3 text-sm text-[var(--teal)]">{{ item.meta }}</div>
+                    </div>
+                </article>
+                {% else %}
+                <div class="rounded-[24px] bg-white/72 border border-[var(--border)] p-5 text-sm text-[var(--muted)]">还没有闭环记录，先完成一轮筛查与调节任务。</div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <aside class="space-y-6">
+        <section class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">量表记录</div>
+            <div class="mt-4 space-y-3">
+                {% for record in scales[:6] %}
+                <div class="rounded-[24px] bg-white/70 border border-[var(--border)] p-4">
+                    <div class="flex items-center justify-between gap-4">
+                        <div class="font-medium">{{ record.scale_code }}</div>
+                        <div class="text-xs text-[var(--muted)]">{{ record.completed_at }}</div>
+                    </div>
+                    <div class="mt-2 text-sm text-[var(--muted)]">{{ record.severity_label }} · 总分 {{ record.total_score }}</div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="glass-panel rounded-[30px] p-6">
+            <div class="text-xs uppercase tracking-[0.24em] text-[var(--muted)]">咨询摘要占位</div>
+            <div class="mt-4 space-y-3">
+                {% for round in counseling_rounds[:4] %}
+                <div class="rounded-[24px] bg-white/70 border border-[var(--border)] p-4">
+                    <div class="text-sm font-medium">用户</div>
+                    <p class="mt-2 text-sm leading-7 text-[var(--muted)]">{{ round.user_message }}</p>
+                    <div class="mt-3 text-sm font-medium">系统</div>
+                    <p class="mt-2 text-sm leading-7 text-[var(--muted)]">{{ round.ai_response }}</p>
+                </div>
+                {% else %}
+                <div class="rounded-[24px] bg-white/70 border border-[var(--border)] p-4 text-sm text-[var(--muted)]">当前没有聊天摘要，后续可继续把 AI 咨询的记录并入这条时间线。</div>
+                {% endfor %}
+            </div>
+        </section>
+    </aside>
+</div>
+{% endblock %}
+

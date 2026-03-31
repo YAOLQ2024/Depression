@@ -17,6 +17,7 @@ import os
 import struct
 import threading
 import time
+import tempfile
 from collections import deque
 from typing import Dict, List, Optional, Sequence
 
@@ -66,6 +67,72 @@ def _parse_channel_map(raw_value: Optional[str]) -> List[int]:
     except ValueError:
         pass
     return [0, 1, 2]
+
+
+def _truthy_env(value: Optional[str]) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+_lsl_runtime_configured = False
+
+
+def _configure_lsl_runtime_from_env():
+    global _lsl_runtime_configured
+    if _lsl_runtime_configured:
+        return
+
+    if os.getenv("LSLAPICFG"):
+        _lsl_runtime_configured = True
+        return
+
+    explicit_path = os.getenv("EEG_LSL_CONFIG_PATH")
+    if explicit_path:
+        os.environ["LSLAPICFG"] = explicit_path
+        _lsl_runtime_configured = True
+        print(f"[EEG][LSL] 使用外部配置: {explicit_path}")
+        return
+
+    known_peers_raw = os.getenv("EEG_LSL_KNOWN_PEERS", "")
+    known_peers = [peer.strip() for peer in known_peers_raw.split(",") if peer.strip()]
+    session_id = os.getenv("EEG_LSL_SESSION_ID", "").strip()
+    resolve_scope = os.getenv("EEG_LSL_RESOLVE_SCOPE", "").strip()
+    disable_ipv6 = _truthy_env(os.getenv("EEG_LSL_DISABLE_IPV6"))
+
+    if not (known_peers or session_id or resolve_scope or disable_ipv6):
+        _lsl_runtime_configured = True
+        return
+
+    lines = []
+    if disable_ipv6:
+        lines.extend([
+            "[ports]",
+            "IPv6 = disable",
+            "",
+        ])
+
+    if resolve_scope:
+        lines.extend([
+            "[multicast]",
+            f"ResolveScope = {resolve_scope}",
+            "",
+        ])
+
+    if known_peers or session_id:
+        lines.append("[lab]")
+        if known_peers:
+            lines.append("KnownPeers = {" + ", ".join(known_peers) + "}")
+        if session_id:
+            lines.append(f"SessionID = {session_id}")
+        lines.append("")
+
+    config_path = os.path.join(tempfile.gettempdir(), "depression_lsl_receiver.cfg")
+    with open(config_path, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(lines).strip() + "\n")
+
+    os.environ["LSLAPICFG"] = config_path
+    _lsl_runtime_configured = True
+    print(f"[EEG][LSL] 生成配置: {config_path}")
+    print(open(config_path, "r", encoding="utf-8").read().strip())
 
 
 class EEGDataReceiver:
@@ -240,10 +307,11 @@ class EEGDataReceiver:
 
         try:
             if self.source_mode == "lsl":
+                _configure_lsl_runtime_from_env()
                 try:
                     import pylsl  # noqa: F401
-                except ImportError as exc:
-                    raise RuntimeError("pylsl 未安装，无法使用 LSL 模式") from exc
+                except Exception as exc:
+                    raise RuntimeError(f"LSL 依赖不可用: {exc}") from exc
 
                 self.thread = threading.Thread(target=self._lsl_wave_loop, daemon=True, name="EEG-LSL-Wave")
                 self.thread.start()
@@ -471,17 +539,11 @@ class EEGDataReceiver:
 
     def _lsl_wave_loop(self):
         """LSL 波形流接收循环。"""
-        try:
-            from pylsl import StreamInlet
-        except ImportError as exc:
-            self.last_source_error = "pylsl 未安装"
-            self.running = False
-            print(f"[EEG][LSL] 启动失败: {exc}")
-            return
-
         while self.running:
             inlet = None
             try:
+                from pylsl import StreamInlet
+
                 stream = self._resolve_lsl_stream(
                     stream_name=self.lsl_stream_name,
                     stream_type=self.lsl_stream_type,
@@ -514,15 +576,10 @@ class EEGDataReceiver:
 
     def _lsl_feature_loop(self):
         """可选的 LSL 特征流接收循环。"""
-        try:
-            from pylsl import StreamInlet
-        except ImportError as exc:
-            self.last_source_error = "pylsl 未安装"
-            print(f"[EEG][LSL] 特征流不可用: {exc}")
-            return
-
         while self.running:
             try:
+                from pylsl import StreamInlet
+
                 stream = self._resolve_lsl_stream(
                     stream_name=self.lsl_feature_stream_name,
                     stream_type=self.lsl_feature_stream_type,
@@ -914,9 +971,43 @@ class EEGDataReceiver:
 eeg_receiver = None
 
 
+def _receiver_needs_restart(receiver: Optional[EEGDataReceiver]) -> bool:
+    if receiver is None:
+        return True
+
+    if not receiver.running:
+        return True
+
+    if receiver.emotion_thread and not receiver.emotion_thread.is_alive():
+        return True
+
+    if receiver.thread and not receiver.thread.is_alive():
+        return True
+
+    if receiver.source_mode == "lsl":
+        wants_feature_stream = bool(receiver.lsl_feature_stream_name or os.getenv("EEG_LSL_FEATURE_STREAM_NAME"))
+        if wants_feature_stream and receiver.feature_thread and not receiver.feature_thread.is_alive():
+            return True
+        if wants_feature_stream and receiver.feature_thread is None:
+            return True
+
+    error_text = (receiver.last_source_error or "").lower()
+    if "liblsl" in error_text or "pylsl" in error_text:
+        wave_alive = bool(receiver.thread and receiver.thread.is_alive())
+        if not wave_alive:
+            return True
+
+    return False
+
+
 def get_eeg_receiver():
     global eeg_receiver
-    if eeg_receiver is None:
+    if _receiver_needs_restart(eeg_receiver):
+        if eeg_receiver is not None:
+            try:
+                eeg_receiver.stop()
+            except Exception:
+                pass
         eeg_receiver = EEGDataReceiver()
         try:
             eeg_receiver.start()
