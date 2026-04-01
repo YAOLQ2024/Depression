@@ -15,6 +15,7 @@
 import math
 import os
 import struct
+import tempfile
 import threading
 import time
 from collections import deque
@@ -68,6 +69,93 @@ def _parse_channel_map(raw_value: Optional[str]) -> List[int]:
     return [0, 1, 2]
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _parse_known_peers(raw_value: Optional[str]) -> List[str]:
+    if not raw_value:
+        return []
+
+    normalized = raw_value.replace("\n", ",").replace(";", ",")
+    peers = []
+    for part in normalized.split(","):
+        candidate = part.strip()
+        if candidate:
+            peers.append(candidate)
+    return peers
+
+
+def _build_lsl_api_config(
+    *,
+    known_peers: Sequence[str],
+    session_id: Optional[str],
+    resolve_scope: Optional[str],
+    disable_ipv6: bool,
+) -> str:
+    lines: List[str] = []
+
+    if disable_ipv6:
+        lines.extend(
+            [
+                "[ports]",
+                "IPv6 = disable",
+                "",
+            ]
+        )
+
+    if resolve_scope:
+        lines.extend(
+            [
+                "[multicast]",
+                f"ResolveScope = {resolve_scope}",
+                "",
+            ]
+        )
+
+    if session_id or known_peers:
+        lines.append("[lab]")
+        if session_id:
+            lines.append(f"SessionID = {session_id}")
+        if known_peers:
+            peers_str = ", ".join(known_peers)
+            lines.append(f"KnownPeers = {{{peers_str}}}")
+        lines.append("")
+
+    return "\n".join(lines).strip() + ("\n" if lines else "")
+
+
+def _ensure_lsl_api_config(
+    *,
+    file_name: str,
+    known_peers: Sequence[str],
+    session_id: Optional[str],
+    resolve_scope: Optional[str],
+    disable_ipv6: bool,
+) -> Optional[str]:
+    existing_cfg = os.getenv("LSLAPICFG")
+    if existing_cfg:
+        return existing_cfg
+
+    config_text = _build_lsl_api_config(
+        known_peers=known_peers,
+        session_id=session_id,
+        resolve_scope=resolve_scope,
+        disable_ipv6=disable_ipv6,
+    )
+    if not config_text:
+        return None
+
+    cfg_path = os.path.join(tempfile.gettempdir(), file_name)
+    with open(cfg_path, "w", encoding="utf-8") as cfg_file:
+        cfg_file.write(config_text)
+    os.environ["LSLAPICFG"] = cfg_path
+    return cfg_path
+
+
 class EEGDataReceiver:
     """脑电数据接收器，统一提供前端所需的数据接口。"""
 
@@ -107,6 +195,26 @@ class EEGDataReceiver:
         self.lsl_feature_stream_type = lsl_feature_stream_type or os.getenv("EEG_LSL_FEATURE_STREAM_TYPE", "EEG_Features")
         self.lsl_resolve_timeout = _env_float("EEG_LSL_RESOLVE_TIMEOUT", 2.0)
         self.lsl_pull_timeout = _env_float("EEG_LSL_PULL_TIMEOUT", 0.2)
+        self.lsl_known_peers = _parse_known_peers(os.getenv("EEG_LSL_KNOWN_PEERS"))
+        raw_resolve_scope = (os.getenv("EEG_LSL_RESOLVE_SCOPE") or "").strip().lower()
+        self.lsl_resolve_scope = raw_resolve_scope if raw_resolve_scope in {
+            "machine",
+            "link",
+            "site",
+            "organization",
+            "global",
+        } else None
+        self.lsl_session_id = (os.getenv("EEG_LSL_SESSION_ID") or "").strip() or None
+        self.lsl_disable_ipv6 = _env_flag("EEG_LSL_DISABLE_IPV6", False)
+        self.lsl_api_cfg_path = None
+        if self.source_mode == "lsl":
+            self.lsl_api_cfg_path = _ensure_lsl_api_config(
+                file_name="depression_lsl_receiver.cfg",
+                known_peers=self.lsl_known_peers,
+                session_id=self.lsl_session_id,
+                resolve_scope=self.lsl_resolve_scope,
+                disable_ipv6=self.lsl_disable_ipv6,
+            )
 
         self.running = False
         self.thread = None
@@ -275,6 +383,16 @@ class EEGDataReceiver:
                 if self.lsl_feature_stream_name:
                     print(f"  LSL特征流: name={self.lsl_feature_stream_name}, type={self.lsl_feature_stream_type}")
                 print(f"  LSL通道映射: {self.lsl_channel_map}")
+                if self.lsl_known_peers:
+                    print(f"  LSL KnownPeers: {', '.join(self.lsl_known_peers)}")
+                if self.lsl_session_id:
+                    print(f"  LSL SessionID: {self.lsl_session_id}")
+                if self.lsl_resolve_scope:
+                    print(f"  LSL ResolveScope: {self.lsl_resolve_scope}")
+                if self.lsl_disable_ipv6:
+                    print("  LSL IPv6: disable")
+                if self.lsl_api_cfg_path:
+                    print(f"  LSL 配置文件: {self.lsl_api_cfg_path}")
             print("[EEG] 情绪推理线程已启动（1000ms更新频率）")
             return True
 

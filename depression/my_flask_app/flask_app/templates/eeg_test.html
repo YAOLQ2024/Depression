@@ -1,131 +1,503 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
-    <title>脑电数据流测试</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG 调试页</title>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; padding: 20px; }
-        .log { background: #111; padding: 10px; margin: 10px 0; border: 1px solid #0f0; max-height: 400px; overflow-y: auto; }
-        .error { color: #f00; }
-        .success { color: #0ff; }
-        canvas { border: 1px solid #0f0; background: #000; margin: 20px 0; }
+        :root {
+            --bg: #08111f;
+            --panel: #101c2e;
+            --panel-border: rgba(255, 255, 255, 0.08);
+            --text: #eaf2ff;
+            --muted: #98abc8;
+            --accent: #5ca8ff;
+            --success: #3dd598;
+            --warning: #ffd166;
+            --danger: #ff6b6b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+            background:
+                radial-gradient(circle at top right, rgba(92, 168, 255, 0.18), transparent 30%),
+                radial-gradient(circle at bottom left, rgba(61, 213, 152, 0.12), transparent 28%),
+                var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        .page {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            margin: 0 0 8px;
+            font-size: 28px;
+        }
+
+        .subtle {
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1.35fr 0.85fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--panel-border);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .panel h2 {
+            margin: 0 0 14px;
+            font-size: 16px;
+            color: var(--muted);
+            letter-spacing: 0.04em;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .stat {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            padding: 12px 14px;
+        }
+
+        .stat-label {
+            color: var(--muted);
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .status-pill.connected {
+            background: rgba(61, 213, 152, 0.14);
+            color: var(--success);
+        }
+
+        .status-pill.waiting {
+            background: rgba(255, 209, 102, 0.14);
+            color: var(--warning);
+        }
+
+        .status-pill.error {
+            background: rgba(255, 107, 107, 0.14);
+            color: var(--danger);
+        }
+
+        .wave-list {
+            display: grid;
+            gap: 14px;
+        }
+
+        .wave-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            border-radius: 16px;
+            padding: 14px;
+        }
+
+        .wave-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--muted);
+            margin-bottom: 10px;
+            font-size: 13px;
+        }
+
+        canvas {
+            width: 100%;
+            height: 140px;
+            border-radius: 12px;
+            background: #060d18;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        pre {
+            margin: 0;
+            padding: 14px;
+            border-radius: 14px;
+            background: #060d18;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: #d9e8ff;
+            overflow: auto;
+            max-height: 250px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .log {
+            max-height: 250px;
+        }
+
+        .log-line {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .log-line:last-child {
+            border-bottom: 0;
+        }
+
+        @media (max-width: 1080px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
     </style>
 </head>
 <body>
-    <h1>🧠 脑电数据流测试页面</h1>
-    
-    <h2>连接状态: <span id="status">未连接</span></h2>
-    
-    <h3>实时日志:</h3>
-    <div class="log" id="log"></div>
-    
-    <h3>最新数据:</h3>
-    <pre id="latest-data">等待数据...</pre>
-    
-    <h3>波形图:</h3>
-    <canvas id="waveform" width="800" height="200"></canvas>
-    
+    <div class="page">
+        <h1>EEG 调试页</h1>
+        <div class="subtle">用于确认 Linux 端是否已经收到 LSL 波形流和特征流。</div>
+
+        <div class="grid">
+            <section class="panel">
+                <h2>实时波形</h2>
+                <div id="status-pill" class="status-pill waiting">等待 EEG 流</div>
+
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-label">数据源</div>
+                        <div id="source-mode" class="stat-value">-</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">总包数</div>
+                        <div id="total-packets" class="stat-value">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">原始波形包</div>
+                        <div id="data-packets" class="stat-value">0</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">特征包</div>
+                        <div id="feature-packets" class="stat-value">0</div>
+                    </div>
+                </div>
+
+                <div class="wave-list">
+                    <div class="wave-card">
+                        <div class="wave-title"><span>Channel 1</span><span>F3</span></div>
+                        <canvas id="canvas-1" width="920" height="140"></canvas>
+                    </div>
+                    <div class="wave-card">
+                        <div class="wave-title"><span>Channel 2</span><span>F4</span></div>
+                        <canvas id="canvas-2" width="920" height="140"></canvas>
+                    </div>
+                    <div class="wave-card">
+                        <div class="wave-title"><span>Channel 3</span><span>Fz</span></div>
+                        <canvas id="canvas-3" width="920" height="140"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel">
+                <h2>分类与日志</h2>
+                <div id="classification-pill" class="status-pill waiting">分类等待中</div>
+
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-label">分类标签</div>
+                        <div id="emotion-label" class="stat-value">standby</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">分类分数</div>
+                        <div id="emotion-score" class="stat-value">0.00</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">分类原因</div>
+                        <div id="emotion-reason" class="stat-value">initializing</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-label">最近更新时间</div>
+                        <div id="last-update" class="stat-value">-</div>
+                    </div>
+                </div>
+
+                <h2>最新 EEG 数据</h2>
+                <pre id="latest-data">等待数据...</pre>
+
+                <h2 style="margin-top: 18px;">运行日志</h2>
+                <pre id="log" class="log"></pre>
+            </section>
+        </div>
+    </div>
+
     <script>
-        const log = document.getElementById('log');
-        const statusEl = document.getElementById('status');
+        const canvases = {
+            channel1: document.getElementById('canvas-1'),
+            channel2: document.getElementById('canvas-2'),
+            channel3: document.getElementById('canvas-3'),
+        };
+
         const latestDataEl = document.getElementById('latest-data');
-        const canvas = document.getElementById('waveform');
-        const ctx = canvas.getContext('2d');
-        
-        let dataBuffer = [];
-        
-        function addLog(msg, type = 'info') {
-            const time = new Date().toLocaleTimeString();
-            const className = type === 'error' ? 'error' : (type === 'success' ? 'success' : '');
-            log.innerHTML += `<div class="${className}">[${time}] ${msg}</div>`;
-            log.scrollTop = log.scrollHeight;
+        const logEl = document.getElementById('log');
+        const statusPill = document.getElementById('status-pill');
+        const classificationPill = document.getElementById('classification-pill');
+
+        const EEG_SAMPLE_RATE = 500;
+        const MAX_WAVE_POINTS = 500;
+        const maxLogLines = 24;
+        let lastConnectionState = '';
+        let lastClassificationState = '';
+
+        function appendLog(message) {
+            const stamp = new Date().toLocaleTimeString();
+            const current = logEl.textContent.trim() ? logEl.textContent.trim().split('\n') : [];
+            current.push(`[${stamp}] ${message}`);
+            logEl.textContent = current.slice(-maxLogLines).join('\n');
+            logEl.scrollTop = logEl.scrollHeight;
         }
-        
-        // 连接到 SSE 流
-        addLog('正在连接到 /eeg/stream...');
-        const eventSource = new EventSource('/eeg/stream');
-        
-        eventSource.onopen = () => {
-            statusEl.textContent = '✓ 已连接';
-            statusEl.style.color = '#0f0';
-            addLog('✓ SSE 连接已建立', 'success');
-        };
-        
-        eventSource.onmessage = (event) => {
-            try {
-                const batch = JSON.parse(event.data);
-                addLog(`收到数据批次: ${batch.length} 条`, 'success');
-                
-                if (batch && batch.length > 0) {
-                    batch.forEach(item => {
-                        if (item.type === 'raw' && item.channel === 1) {
-                            dataBuffer.push(item.value);
-                            if (dataBuffer.length > 500) dataBuffer.shift();
-                        }
-                    });
-                    
-                    // 更新最新数据显示
-                    const latest = batch[batch.length - 1];
-                    latestDataEl.textContent = JSON.stringify(latest, null, 2);
-                    
-                    // 绘制波形
-                    drawWaveform();
-                }
-            } catch (e) {
-                addLog(`✗ 数据解析错误: ${e.message}`, 'error');
-                addLog(`原始数据: ${event.data}`, 'error');
+
+        function setPillState(el, state, text) {
+            el.className = `status-pill ${state}`;
+            el.textContent = text;
+        }
+
+        function formatTimestamp(ts) {
+            if (!ts) return '-';
+            return new Date(ts * 1000).toLocaleTimeString();
+        }
+
+        function formatAxisValue(value) {
+            if (!Number.isFinite(value)) return '-';
+            if (Math.abs(value) >= 100) return value.toFixed(0);
+            if (Math.abs(value) >= 10) return value.toFixed(1);
+            return value.toFixed(2);
+        }
+
+        function drawWave(canvas, values) {
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            ctx.clearRect(0, 0, width, height);
+
+            const margin = { top: 12, right: 12, bottom: 28, left: 54 };
+            const plotLeft = margin.left;
+            const plotTop = margin.top;
+            const plotWidth = width - margin.left - margin.right;
+            const plotHeight = height - margin.top - margin.bottom;
+
+            const slice = (values || []).slice(-MAX_WAVE_POINTS);
+            let min = slice.length >= 2 ? Math.min(...slice) : -100;
+            let max = slice.length >= 2 ? Math.max(...slice) : 100;
+            if (min === max) {
+                min -= 1;
+                max += 1;
             }
-        };
-        
-        eventSource.onerror = (e) => {
-            statusEl.textContent = '✗ 连接错误';
-            statusEl.style.color = '#f00';
-            addLog('✗ SSE 连接错误', 'error');
-        };
-        
-        function drawWaveform() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            if (dataBuffer.length < 2) return;
-            
+
+            const padding = Math.max((max - min) * 0.12, 1);
+            min -= padding;
+            max += padding;
+
+            const range = max - min;
+            const durationSec = Math.max(slice.length / EEG_SAMPLE_RATE, 0.2);
+            const horizontalTicks = 4;
+            const verticalTicks = 4;
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i <= verticalTicks; i += 1) {
+                const y = plotTop + (i / verticalTicks) * plotHeight;
+                ctx.beginPath();
+                ctx.moveTo(plotLeft, y);
+                ctx.lineTo(plotLeft + plotWidth, y);
+                ctx.stroke();
+
+                const value = max - (i / verticalTicks) * range;
+                ctx.fillStyle = 'rgba(152,171,200,0.88)';
+                ctx.font = '11px JetBrains Mono, monospace';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(formatAxisValue(value), plotLeft - 8, y);
+            }
+
+            for (let i = 0; i <= horizontalTicks; i += 1) {
+                const x = plotLeft + (i / horizontalTicks) * plotWidth;
+                ctx.beginPath();
+                ctx.moveTo(x, plotTop);
+                ctx.lineTo(x, plotTop + plotHeight);
+                ctx.stroke();
+
+                const secondsAgo = durationSec - (i / horizontalTicks) * durationSec;
+                const label = i === horizontalTicks ? '0.00s' : `-${secondsAgo.toFixed(2)}s`;
+                ctx.fillStyle = 'rgba(152,171,200,0.88)';
+                ctx.font = '11px JetBrains Mono, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(label, x, plotTop + plotHeight + 8);
+            }
+
+            ctx.fillStyle = 'rgba(152,171,200,0.75)';
+            ctx.font = '11px JetBrains Mono, monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText('uV', 6, 4);
+            ctx.textAlign = 'right';
+            ctx.fillText('time', width - 6, plotTop + plotHeight + 8);
+
+            if (slice.length < 2) {
+                ctx.fillStyle = 'rgba(152,171,200,0.7)';
+                ctx.font = '12px JetBrains Mono, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Waiting for EEG waveform...', plotLeft + plotWidth / 2, plotTop + plotHeight / 2);
+                return;
+            }
+
             ctx.beginPath();
-            const step = canvas.width / dataBuffer.length;
-            const centerY = canvas.height / 2;
-            const scale = canvas.height / 100; // 调整缩放
-            
-            dataBuffer.forEach((val, i) => {
-                const x = i * step;
-                const y = centerY - (val * scale);
-                
-                if (i === 0) ctx.moveTo(x, y);
+            ctx.strokeStyle = '#5ca8ff';
+            ctx.lineWidth = 2;
+
+            slice.forEach((value, index) => {
+                const x = plotLeft + (index / Math.max(slice.length - 1, 1)) * plotWidth;
+                const normalized = (value - min) / range;
+                const y = plotTop + plotHeight - normalized * plotHeight;
+                if (index === 0) ctx.moveTo(x, y);
                 else ctx.lineTo(x, y);
             });
-            
-            ctx.strokeStyle = '#0ff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            // 中心线
-            ctx.strokeStyle = '#333';
-            ctx.beginPath();
-            ctx.moveTo(0, centerY);
-            ctx.lineTo(canvas.width, centerY);
+
             ctx.stroke();
         }
-        
-        // 定期轮询历史数据（备用方案）
-        setInterval(() => {
-            fetch('/eeg/history')
-                .then(r => r.json())
-                .then(d => {
-                    if (d.success && d.data && d.data.values.length > 0) {
-                        addLog(`轮询获取到 ${d.data.values.length} 个历史数据点`, 'success');
-                        dataBuffer = d.data.values.slice(-500);
-                        drawWaveform();
+
+        async function updateChannels() {
+            try {
+                const response = await fetch('/eeg/channels', { cache: 'no-store' });
+                const payload = await response.json();
+                if (!payload.success) {
+                    throw new Error(payload.error || 'EEG channels request failed');
+                }
+
+                const data = payload.data || {};
+                const source = data.source || {};
+                const connected = Boolean(source.connected);
+                const sourceMode = source.source_mode || '-';
+                const lastError = source.last_error || '';
+
+                document.getElementById('source-mode').textContent = sourceMode;
+                document.getElementById('total-packets').textContent = data.stats?.total_packets ?? 0;
+                document.getElementById('data-packets').textContent = data.stats?.data_packets ?? 0;
+                document.getElementById('feature-packets').textContent = data.stats?.feature_packets ?? 0;
+                document.getElementById('last-update').textContent = formatTimestamp(source.last_data_timestamp);
+
+                latestDataEl.textContent = JSON.stringify({
+                    source,
+                    channel1: data.channel1?.features?.current || {},
+                    channel2: data.channel2?.features?.current || {},
+                    channel3: data.channel3?.features?.current || {},
+                }, null, 2);
+
+                drawWave(canvases.channel1, data.channel1?.waveform || []);
+                drawWave(canvases.channel2, data.channel2?.waveform || []);
+                drawWave(canvases.channel3, data.channel3?.waveform || []);
+
+                if (connected) {
+                    setPillState(statusPill, 'connected', `已连接 ${sourceMode.toUpperCase()} EEG 流`);
+                    if (lastConnectionState !== 'connected') {
+                        appendLog(`EEG 已连接，source=${sourceMode}`);
+                        lastConnectionState = 'connected';
                     }
-                })
-                .catch(e => addLog(`轮询失败: ${e.message}`, 'error'));
-        }, 2000);
+                } else if (lastError) {
+                    setPillState(statusPill, 'error', `连接异常: ${lastError}`);
+                    if (lastConnectionState !== `error:${lastError}`) {
+                        appendLog(`EEG 连接异常: ${lastError}`);
+                        lastConnectionState = `error:${lastError}`;
+                    }
+                } else {
+                    setPillState(statusPill, 'waiting', '等待 EEG 流');
+                    if (lastConnectionState !== 'waiting') {
+                        appendLog('等待 EEG 原始波形流...');
+                        lastConnectionState = 'waiting';
+                    }
+                }
+            } catch (error) {
+                setPillState(statusPill, 'error', 'EEG 接口请求失败');
+                if (lastConnectionState !== `fetch:${error.message}`) {
+                    appendLog(`请求 /eeg/channels 失败: ${error.message}`);
+                    lastConnectionState = `fetch:${error.message}`;
+                }
+            }
+        }
+
+        async function updateClassification() {
+            try {
+                const response = await fetch('/eeg/classification', { cache: 'no-store' });
+                const payload = await response.json();
+                if (!payload.success) {
+                    throw new Error(payload.error || 'EEG classification request failed');
+                }
+
+                const data = payload.data || {};
+                const label = data.label || 'standby';
+                const reason = data.reason || 'initializing';
+                const score = Number(data.score || 0);
+
+                document.getElementById('emotion-label').textContent = label;
+                document.getElementById('emotion-score').textContent = score.toFixed(2);
+                document.getElementById('emotion-reason').textContent = reason;
+
+                const pillState = label === 'standby' ? 'waiting' : 'connected';
+                setPillState(classificationPill, pillState, `分类: ${label} / ${reason}`);
+
+                const nextState = `${label}:${reason}`;
+                if (lastClassificationState !== nextState) {
+                    appendLog(`分类更新 -> label=${label}, reason=${reason}, score=${score.toFixed(2)}`);
+                    lastClassificationState = nextState;
+                }
+            } catch (error) {
+                setPillState(classificationPill, 'error', '分类接口请求失败');
+                if (lastClassificationState !== `fetch:${error.message}`) {
+                    appendLog(`请求 /eeg/classification 失败: ${error.message}`);
+                    lastClassificationState = `fetch:${error.message}`;
+                }
+            }
+        }
+
+        appendLog('调试页已启动，开始轮询 EEG 接口...');
+        updateChannels();
+        updateClassification();
+        setInterval(updateChannels, 500);
+        setInterval(updateClassification, 1200);
     </script>
 </body>
 </html>
-

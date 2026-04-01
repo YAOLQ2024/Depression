@@ -387,23 +387,25 @@
                             </div>
                             <span class="text-xs font-bold text-slate-600">Multi-Channel EEG</span>
                         </div>
-                        <span class="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100 font-mono">Stable</span>
+                        <span id="eeg-status-badge" class="text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 font-mono">Waiting</span>
                     </div>
                     
-                    <!-- EEG Channels - 高度增大二分之一 (60px -> 90px) -->
-                    <div class="w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner mb-2" style="height: 90px;">
-                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">FP1</div>
+                    <div class="w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner mb-2" style="height: 112px;">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">F3</div>
                         <canvas id="eegCanvas1" class="w-full h-full"></canvas>
                     </div>
                     
-                    <div class="w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner mb-2" style="height: 90px;">
-                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">FP2</div>
+                    <div class="w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner mb-2" style="height: 112px;">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">F4</div>
                         <canvas id="eegCanvas2" class="w-full h-full"></canvas>
                     </div>
 
-                    <div class="w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner" style="height: 90px;">
-                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">CZ</div>
+                    <div class="w-full bg-white/50 rounded-xl border border-slate-100 overflow-hidden relative shadow-inner" style="height: 112px;">
+                        <div class="absolute top-1 left-2 text-[9px] font-bold text-slate-400 z-10">Fz</div>
                         <canvas id="eegCanvas3" class="w-full h-full"></canvas>
+                    </div>
+                    <div id="eeg-source-note" class="mt-2 text-[10px] text-slate-500 leading-relaxed">
+                        正在等待 EEG 波形流接入...
                     </div>
                 </div>
 
@@ -914,6 +916,17 @@ document.addEventListener('alpine:init', () => {
                 return true;
             }
 
+            const isLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+            const insecureRemoteOrigin = !window.isSecureContext && !isLocalhost;
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                const labelElement = document.getElementById('emotion-label');
+                if (labelElement) {
+                    labelElement.textContent = '浏览器不支持摄像头接口';
+                }
+                return false;
+            }
+
             try {
                 // 请求浏览器摄像头权限
                 const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -937,7 +950,7 @@ document.addEventListener('alpine:init', () => {
                 console.error('摄像头权限被拒绝或无法访问:', error);
                 const labelElement = document.getElementById('emotion-label');
                 if (labelElement) {
-                    labelElement.textContent = '摄像头未授权';
+                    labelElement.textContent = insecureRemoteOrigin ? '需 localhost 或 HTTPS' : '摄像头未授权';
                 }
 
                 return false;
@@ -1157,12 +1170,14 @@ document.addEventListener('alpine:init', () => {
                 document.getElementById('eegCanvas3')
             ];
             const ctxs = canvases.map(c => c ? c.getContext('2d') : null).filter(c => c);
-            const channelNames = ['FP1', 'FP2', 'CZ'];
-            
-            // 存储波形数据
+            const statusBadge = document.getElementById('eeg-status-badge');
+            const sourceNote = document.getElementById('eeg-source-note');
+            const channelNames = ['F3', 'F4', 'Fz'];
             const waveforms = [[], [], []];
-            const maxPoints = 200; // 保留最近200个数据点
-            
+            const maxPoints = 500;
+            const eegSampleRate = 500;
+            const colors = ['#6366F1', '#3B82F6', '#8B5CF6'];
+
             const resizeCanvases = () => {
                 canvases.forEach(canvas => {
                     if(canvas && canvas.parentElement) {
@@ -1177,6 +1192,30 @@ document.addEventListener('alpine:init', () => {
 
             const scheduleNextFetch = (delay = 250) => {
                 this.eegTimer = window.setTimeout(fetchEEGData, delay);
+            };
+
+            const setEEGStatus = (state, text, note = '') => {
+                if (statusBadge) {
+                    statusBadge.textContent = text;
+                    if (state === 'connected') {
+                        statusBadge.className = 'text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100 font-mono';
+                    } else if (state === 'error') {
+                        statusBadge.className = 'text-[10px] text-red-600 bg-red-50 px-2 py-0.5 rounded border border-red-100 font-mono';
+                    } else {
+                        statusBadge.className = 'text-[10px] text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 font-mono';
+                    }
+                }
+
+                if (sourceNote) {
+                    sourceNote.textContent = note;
+                }
+            };
+
+            const formatAxisValue = (value) => {
+                if (!Number.isFinite(value)) return '-';
+                if (Math.abs(value) >= 100) return value.toFixed(0);
+                if (Math.abs(value) >= 10) return value.toFixed(1);
+                return value.toFixed(2);
             };
 
             // 从后端获取EEG数据
@@ -1196,17 +1235,26 @@ document.addEventListener('alpine:init', () => {
                     const response = await fetch('/eeg/channels');
                     const data = await response.json();
                     if (data.success && data.data) {
+                        const source = data.data.source || {};
+                        if (source.connected) {
+                            setEEGStatus('connected', 'Stable', `EEG 原始波形已接入，来源: ${(source.source_mode || 'lsl').toUpperCase()}`);
+                        } else if (source.last_error) {
+                            setEEGStatus('error', 'Error', `EEG 连接异常: ${source.last_error}`);
+                        } else {
+                            setEEGStatus('waiting', 'Waiting', '正在等待 EEG 波形流接入...');
+                        }
+
                         // 更新三个通道的数据
                         for (let i = 0; i < 3; i++) {
                             const channelKey = `channel${i + 1}`;
                             if (data.data[channelKey] && data.data[channelKey].waveform) {
-                                // 直接使用后端最新窗口，避免轮询时重复追加同一批点。
                                 waveforms[i] = data.data[channelKey].waveform.slice(-maxPoints);
                             }
                         }
                     }
                 } catch (error) {
                     console.error('获取EEG数据失败:', error);
+                    setEEGStatus('error', 'Error', `获取 EEG 数据失败: ${error.message}`);
                 } finally {
                     this.eegFetchInFlight = false;
                     scheduleNextFetch(250);
@@ -1214,50 +1262,98 @@ document.addEventListener('alpine:init', () => {
             };
             
             fetchEEGData();
-            
+
             function drawEEG() {
                 ctxs.forEach((ctx, index) => {
-                    if(!ctx) return;
+                    if (!ctx) return;
                     const canvas = canvases[index];
                     const width = canvas.width;
                     const height = canvas.height;
-                    
+
                     ctx.clearRect(0, 0, width, height);
-                    
-                    if (waveforms[index].length === 0) {
-                        // 没有数据时显示占位
-                        ctx.fillStyle = '#94A3B8';
-                        ctx.font = '12px monospace';
+
+                    const margin = { top: 12, right: 12, bottom: 24, left: 46 };
+                    const plotLeft = margin.left;
+                    const plotTop = margin.top;
+                    const plotWidth = Math.max(width - margin.left - margin.right, 10);
+                    const plotHeight = Math.max(height - margin.top - margin.bottom, 10);
+                    const slice = waveforms[index].slice(-maxPoints);
+
+                    let min = slice.length >= 2 ? Math.min(...slice) : -100;
+                    let max = slice.length >= 2 ? Math.max(...slice) : 100;
+                    if (min === max) {
+                        min -= 1;
+                        max += 1;
+                    }
+
+                    const padding = Math.max((max - min) * 0.12, 1);
+                    min -= padding;
+                    max += padding;
+
+                    const range = max - min;
+                    const durationSec = Math.max(slice.length / eegSampleRate, 0.2);
+                    const horizontalTicks = 4;
+                    const verticalTicks = 4;
+
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.14)';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i <= verticalTicks; i += 1) {
+                        const y = plotTop + (i / verticalTicks) * plotHeight;
+                        ctx.beginPath();
+                        ctx.moveTo(plotLeft, y);
+                        ctx.lineTo(plotLeft + plotWidth, y);
+                        ctx.stroke();
+
+                        const value = max - (i / verticalTicks) * range;
+                        ctx.fillStyle = 'rgba(100,116,139,0.92)';
+                        ctx.font = '10px JetBrains Mono, monospace';
+                        ctx.textAlign = 'right';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(formatAxisValue(value), plotLeft - 6, y);
+                    }
+
+                    for (let i = 0; i <= horizontalTicks; i += 1) {
+                        const x = plotLeft + (i / horizontalTicks) * plotWidth;
+                        ctx.beginPath();
+                        ctx.moveTo(x, plotTop);
+                        ctx.lineTo(x, plotTop + plotHeight);
+                        ctx.stroke();
+
+                        const secondsAgo = durationSec - (i / horizontalTicks) * durationSec;
+                        const label = i === horizontalTicks ? '0.00s' : `-${secondsAgo.toFixed(1)}s`;
+                        ctx.fillStyle = 'rgba(100,116,139,0.92)';
+                        ctx.font = '10px JetBrains Mono, monospace';
                         ctx.textAlign = 'center';
-                        ctx.fillText('等待数据...', width / 2, height / 2);
+                        ctx.textBaseline = 'top';
+                        ctx.fillText(label, x, plotTop + plotHeight + 6);
+                    }
+
+                    if (slice.length < 2) {
+                        ctx.fillStyle = '#94A3B8';
+                        ctx.font = '11px JetBrains Mono, monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(`等待 ${channelNames[index]} 数据...`, plotLeft + plotWidth / 2, plotTop + plotHeight / 2);
                         return;
                     }
-                    
+
                     ctx.beginPath();
-                    const colors = ['#6366F1', '#3B82F6', '#8B5CF6'];
                     ctx.strokeStyle = colors[index];
-                    ctx.lineWidth = 2;
-                    
-                    const dataPoints = waveforms[index];
-                    const pointSpacing = width / dataPoints.length;
-                    
-                    for (let i = 0; i < dataPoints.length; i++) {
-                        const x = i * pointSpacing;
-                        // 将数据值映射到画布高度，假设数据范围在-100到100之间
-                        const normalizedValue = Math.max(-1, Math.min(1, dataPoints[i] / 100));
-                        const y = height / 2 - (normalizedValue * height * 0.3);
-                        
+                    ctx.lineWidth = 1.8;
+                    slice.forEach((value, i) => {
+                        const x = plotLeft + (i / Math.max(slice.length - 1, 1)) * plotWidth;
+                        const normalized = (value - min) / range;
+                        const y = plotTop + plotHeight - normalized * plotHeight;
+
                         if (i === 0) ctx.moveTo(x, y);
                         else ctx.lineTo(x, y);
-                    }
-                    
+                    });
                     ctx.stroke();
-                    
-                    // 填充渐变
-                    ctx.lineTo(width, height);
-                    ctx.lineTo(0, height);
+
+                    ctx.lineTo(plotLeft + plotWidth, plotTop + plotHeight);
+                    ctx.lineTo(plotLeft, plotTop + plotHeight);
                     ctx.closePath();
-                    const gradient = ctx.createLinearGradient(0, 0, 0, height);
+                    const gradient = ctx.createLinearGradient(0, plotTop, 0, plotTop + plotHeight);
                     gradient.addColorStop(0, colors[index] + '33');
                     gradient.addColorStop(1, colors[index] + '00');
                     ctx.fillStyle = gradient;

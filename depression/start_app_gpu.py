@@ -10,12 +10,73 @@ import os
 import signal
 import time
 import socket
+import ctypes
 import psutil
 from pathlib import Path
 
 # 添加项目路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'my_flask_app'))
+
+_RUNTIME_PRELOAD_DONE = False
+
+
+def preload_conda_runtime_libraries():
+    """
+    先把当前环境自己的 C++ 运行库拉进进程，避免 onnxruntime 抢先加载到系统旧版 libstdc++，
+    导致后续 pylsl / liblsl 出现 CXXABI / platform mismatch。
+    """
+    global _RUNTIME_PRELOAD_DONE
+    if _RUNTIME_PRELOAD_DONE:
+        return True
+
+    lib_dir = Path(sys.executable).resolve().parent.parent / "lib"
+    candidates = [
+        lib_dir / "libstdc++.so.6",
+        lib_dir / "libgcc_s.so.1",
+        lib_dir / "libpugixml.so.1",
+    ]
+
+    loaded = []
+    missing = []
+    failed = []
+
+    rtld_global = getattr(ctypes, "RTLD_GLOBAL", 0)
+    rtld_now = getattr(ctypes, "RTLD_NOW", 0)
+    mode = rtld_global | rtld_now
+
+    for lib_path in candidates:
+        if not lib_path.exists():
+            missing.append(str(lib_path))
+            continue
+        try:
+            ctypes.CDLL(str(lib_path), mode=mode)
+            loaded.append(str(lib_path))
+        except OSError as exc:
+            failed.append(f"{lib_path}: {exc}")
+
+    if loaded:
+        print("[Runtime] 已预加载环境运行库:")
+        for path in loaded:
+            print(f"  - {path}")
+
+    if missing:
+        print("[Runtime] 未找到以下候选运行库（已跳过）:")
+        for path in missing:
+            print(f"  - {path}")
+
+    if failed:
+        print("[Runtime] 运行库预加载失败:")
+        for item in failed:
+            print(f"  - {item}")
+        return False
+
+    _RUNTIME_PRELOAD_DONE = True
+    return True
+
+
+# 在任何 ONNX / Flask 相关模块导入前先预加载一次，避免旧版 libstdc++ 抢占进程。
+preload_conda_runtime_libraries()
 
 def signal_handler(signum, frame):
     """信号处理器"""
@@ -207,6 +268,9 @@ def main():
     print("=" * 80)
     print("抑郁症评估系统 - NVIDIA GPU版本")
     print("=" * 80)
+
+    # 再确认一次运行库已经按当前环境优先加载，避免后续导入 app 时被别的模块污染。
+    preload_conda_runtime_libraries()
     
     # 注册信号处理器
     signal.signal(signal.SIGINT, signal_handler)
