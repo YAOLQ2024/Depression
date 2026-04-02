@@ -1,0 +1,2539 @@
+openapi: 3.0.3
+info:
+  title: 抑郁症辅助干预系统 OpenAPI 接口草稿（V1）
+  version: 1.0.0-draft
+  description: |
+    本文档是抑郁症辅助干预系统 V1 阶段的 OpenAPI（接口描述标准）草稿。
+
+    当前草稿基于以下三个设计文档整理而来：
+    1. system_modular_api_design_v1_20260401.md
+    2. system_module_master_table_v1_20260401.md
+    3. system_api_response_standard_v1_20260401.md
+
+    当前目标：
+    1. 固定 11 个一级模块和 12 个二级能力模块的主接口
+    2. 固定统一返回结构 code / message / data / request_id / timestamp
+    3. 为后续 Flask（Web 框架）或 APIFlask（基于 Flask 的 API 框架）实现提供代码依据
+    4. 为组员联调、Mock（模拟接口）和后续服务化改造提供统一契约
+
+    当前范围：
+    1. 每个二级能力模块先提供 1 个主业务接口
+    2. 每个二级能力模块必须提供 1 个 health（健康检查）接口
+    3. 每个二级能力模块必须提供 1 个 meta（元信息）接口
+
+servers:
+  - url: http://127.0.0.1:5000
+    description: 本地 Flask（Web 框架）开发环境
+  - url: http://127.0.0.1:8000
+    description: 预留服务化或独立 API（接口）环境
+
+tags:
+  - name: api-v1
+    description: 统一 API 入口
+  - name: auth-profile
+    description: 身份认证与用户建档模块
+  - name: persona
+    description: 虚拟医生与交互角色模块
+  - name: assessment
+    description: 量表评估模块
+  - name: text-dialogue
+    description: 文本对话与引导问诊模块
+  - name: speech
+    description: 语音处理模块
+  - name: emotion
+    description: 表情识别模块
+  - name: eeg
+    description: 脑电信号模块
+  - name: risk-assessment
+    description: 风险评估与安全建议模块
+  - name: intervention
+    description: 个性化调控与执行模块
+  - name: history-report
+    description: 历史记录与报告模块
+  - name: admin-settings
+    description: 后台管理与系统设置模块
+
+paths:
+  /api/v1/health:
+    get:
+      tags:
+        - api-v1
+      summary: 统一 API 入口健康检查接口
+      operationId: apiV1Health
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/meta:
+    get:
+      tags:
+        - api-v1
+      summary: 统一 API 入口元信息接口
+      operationId: apiV1Meta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/auth-profile/identity-access/login:
+    post:
+      tags:
+        - auth-profile
+      summary: 身份认证与档案能力登录接口
+      operationId: authProfileIdentityAccessLogin
+      description: |
+        `identity-access（身份认证与档案能力）` 的主接口。
+        用于完成登录、身份校验和会话初始化。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+
+  /api/v1/auth-profile/identity-access/health:
+    get:
+      tags:
+        - auth-profile
+      summary: 身份认证与档案能力健康检查接口
+      operationId: authProfileIdentityAccessHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/auth-profile/identity-access/meta:
+    get:
+      tags:
+        - auth-profile
+      summary: 身份认证与档案能力元信息接口
+      operationId: authProfileIdentityAccessMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/persona/virtual-clinician/select:
+    post:
+      tags:
+        - persona
+      summary: 虚拟医生选择能力主接口
+      operationId: personaVirtualClinicianSelect
+      description: |
+        `virtual-clinician（虚拟医生选择能力）` 的主接口。
+        用于用户选择虚拟医生形象、交互风格和语音播报偏好。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonaSelectRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+
+  /api/v1/persona/virtual-clinician/health:
+    get:
+      tags:
+        - persona
+      summary: 虚拟医生选择能力健康检查接口
+      operationId: personaVirtualClinicianHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/persona/virtual-clinician/meta:
+    get:
+      tags:
+        - persona
+      summary: 虚拟医生选择能力元信息接口
+      operationId: personaVirtualClinicianMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/assessment/scale-screening/submit:
+    post:
+      tags:
+        - assessment
+      summary: 结构化量表筛查能力提交接口
+      operationId: assessmentScaleScreeningSubmit
+      description: |
+        `scale-screening（结构化量表筛查能力）` 的主接口。
+        用于提交量表答案、触发计分并返回结构化评估结果。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentSubmitRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+
+  /api/v1/assessment/scale-screening/list:
+    get:
+      tags:
+        - assessment
+      summary: 结构化量表筛查能力列表接口
+      operationId: assessmentScaleScreeningList
+      description: |
+        返回当前已接入的量表定义列表。
+      parameters:
+        - name: scale_slug
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 量表英文标识，可选；传入后仅返回对应量表
+        - name: include_items
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: 是否返回完整题目定义，默认 true
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '401':
+          $ref: '#/components/responses/Error401'
+
+  /api/v1/assessment/scale-screening/result/{record_id}:
+    get:
+      tags:
+        - assessment
+      summary: 结构化量表筛查能力结果查询接口
+      operationId: assessmentScaleScreeningResult
+      parameters:
+        - name: record_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 量表记录 ID / Assessment record identifier
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+
+  /api/v1/assessment/scale-screening/latest:
+    get:
+      tags:
+        - assessment
+      summary: 结构化量表筛查能力最新结果接口
+      operationId: assessmentScaleScreeningLatest
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '401':
+          $ref: '#/components/responses/Error401'
+
+  /api/v1/assessment/scale-screening/draft/{scale_slug}:
+    get:
+      tags:
+        - assessment
+      summary: 结构化量表筛查能力草稿读取接口
+      operationId: assessmentScaleScreeningDraftGet
+      description: |
+        返回当前用户在指定量表下的最新未完成草稿。
+        如果存在 `flow_session_id（流程会话标识）`，则优先返回该流程内的草稿。
+      parameters:
+        - name: scale_slug
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - phq9
+              - gad7
+          description: 量表英文标识 / Scale slug
+        - name: flow_session_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 量表流程会话标识 / Screening flow session identifier
+      responses:
+        '200':
+          description: 草稿读取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScaleDraftResponse'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error400'
+
+  /api/v1/assessment/scale-screening/draft/save:
+    post:
+      tags:
+        - assessment
+      summary: 结构化量表筛查能力草稿保存接口
+      operationId: assessmentScaleScreeningDraftSave
+      description: |
+        用于保存 `PHQ-9（患者健康问卷）` 或 `GAD-7（广泛性焦虑量表）` 的未完成进度。
+        草稿仅用于恢复填写，不参与 `risk-assessment（风险评估与安全建议模块）`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScaleDraftSaveRequest'
+      responses:
+        '200':
+          description: 草稿保存成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScaleDraftResponse'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error400'
+
+  /api/v1/assessment/scale-screening/flow-session/{flow_session_id}/risk-payload-preview:
+    get:
+      tags:
+        - assessment
+      summary: 量表流程风险评估输入预览接口
+      operationId: assessmentScaleScreeningFlowRiskPayloadPreviewGet
+      description: |
+        预览当前 `flow-session（量表流程会话）` 最终会送入
+        `risk-assessment（风险评估与安全建议模块）` 的完整输入体。
+        该接口只返回拼装结果，不会真正执行风险评估。
+      parameters:
+        - name: flow_session_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 量表流程会话标识 / Screening flow session identifier
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error400'
+    post:
+      tags:
+        - assessment
+      summary: 带模态覆盖的量表流程风险评估输入预览接口
+      operationId: assessmentScaleScreeningFlowRiskPayloadPreviewPost
+      description: |
+        可额外传入 `text_summary / speech_summary / emotion_summary / eeg_summary`
+        以预览这些模态接入后将如何进入 `risk-assessment（风险评估与安全建议模块）`。
+        该接口只返回拼装结果，不会真正执行风险评估。
+      parameters:
+        - name: flow_session_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 量表流程会话标识 / Screening flow session identifier
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                trigger_reason:
+                  type: string
+                text_summary:
+                  type: object
+                speech_summary:
+                  type: object
+                emotion_summary:
+                  type: object
+                eeg_summary:
+                  type: object
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '404':
+          $ref: '#/components/responses/Error400'
+
+  /api/v1/assessment/scale-screening/health:
+    get:
+      tags:
+        - assessment
+      summary: 结构化量表筛查能力健康检查接口
+      operationId: assessmentScaleScreeningHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/assessment/scale-screening/meta:
+    get:
+      tags:
+        - assessment
+      summary: 结构化量表筛查能力元信息接口
+      operationId: assessmentScaleScreeningMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/text-dialogue/guided-conversation/run:
+    post:
+      tags:
+        - text-dialogue
+      summary: 引导式文本问诊能力主接口
+      operationId: textDialogueGuidedConversationRun
+      description: |
+        `guided-conversation（引导式文本问诊能力）` 的主接口。
+        用于在初步风险分层之后发起有目的的引导问诊，
+        补全用户画像、提取关键信息并生成结构化摘要，
+        为后续 `intervention-decision（个性化调控决策能力）` 提供输入。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuidedConversationRunRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/text-dialogue/guided-conversation/health:
+    get:
+      tags:
+        - text-dialogue
+      summary: 引导式文本问诊能力健康检查接口
+      operationId: textDialogueGuidedConversationHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/text-dialogue/guided-conversation/meta:
+    get:
+      tags:
+        - text-dialogue
+      summary: 引导式文本问诊能力元信息接口
+      operationId: textDialogueGuidedConversationMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/speech/speech-transcribe/run:
+    post:
+      tags:
+        - speech
+      summary: 语音转写能力主接口
+      operationId: speechSpeechTranscribeRun
+      description: |
+        `speech-transcribe（语音转写能力）` 的主接口。
+        用于将普通话、方言或混合口音音频转成标准文本。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpeechTranscribeRunRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/speech/speech-transcribe/health:
+    get:
+      tags:
+        - speech
+      summary: 语音转写能力健康检查接口
+      operationId: speechSpeechTranscribeHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/speech/speech-transcribe/meta:
+    get:
+      tags:
+        - speech
+      summary: 语音转写能力元信息接口
+      operationId: speechSpeechTranscribeMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/speech/speech-emotion/analyze:
+    post:
+      tags:
+        - speech
+      summary: 语音情绪识别能力主接口
+      operationId: speechSpeechEmotionAnalyze
+      description: |
+        `speech-emotion（语音情绪识别能力）` 的主接口。
+        用于从原始音频中分析情绪倾向、语气和基础声学特征。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SpeechEmotionAnalyzeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/speech/speech-emotion/health:
+    get:
+      tags:
+        - speech
+      summary: 语音情绪识别能力健康检查接口
+      operationId: speechSpeechEmotionHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/speech/speech-emotion/meta:
+    get:
+      tags:
+        - speech
+      summary: 语音情绪识别能力元信息接口
+      operationId: speechSpeechEmotionMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/emotion/facial-affect/analyze:
+    post:
+      tags:
+        - emotion
+      summary: 面部表情情绪识别能力主接口
+      operationId: emotionFacialAffectAnalyze
+      description: |
+        `facial-affect（面部表情情绪识别能力）` 的主接口。
+        用于对图像帧或会话片段中的面部表情进行情绪分析。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FacialAffectAnalyzeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/emotion/facial-affect/health:
+    get:
+      tags:
+        - emotion
+      summary: 面部表情情绪识别能力健康检查接口
+      operationId: emotionFacialAffectHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/emotion/facial-affect/meta:
+    get:
+      tags:
+        - emotion
+      summary: 面部表情情绪识别能力元信息接口
+      operationId: emotionFacialAffectMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/eeg/eeg-sensing/analyze:
+    post:
+      tags:
+        - eeg
+      summary: 脑电采集与分析能力主接口
+      operationId: eegEegSensingAnalyze
+      description: |
+        `eeg-sensing（脑电采集与分析能力）` 的主接口。
+        用于接收脑电快照、文件引用或预处理摘要，并返回特征与分类结果。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EegSensingAnalyzeRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/eeg/eeg-sensing/health:
+    get:
+      tags:
+        - eeg
+      summary: 脑电采集与分析能力健康检查接口
+      operationId: eegEegSensingHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/eeg/eeg-sensing/meta:
+    get:
+      tags:
+        - eeg
+      summary: 脑电采集与分析能力元信息接口
+      operationId: eegEegSensingMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/risk-assessment/risk-stratification/score:
+    post:
+      tags:
+        - risk-assessment
+      summary: 初步风险分层与安全建议能力主接口
+      operationId: riskAssessmentRiskStratificationScore
+      description: |
+        `risk-stratification（初步风险分层与安全建议能力）` 的主接口。
+        用于聚合建档信息、量表结果和作答过程的多模态摘要结果，
+        输出初步风险等级、阈值命中情况、就医建议和是否允许继续体验系统调控。
+        该接口不直接负责最终的个性化调控内容选择。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RiskStratificationScoreRequest'
+            examples:
+              standard_case:
+                summary: 常规评估请求示例
+                value:
+                  user_id: user-1001
+                  session_id: sess-risk-001
+                  user_profile:
+                    age_group: 18-25
+                    gender: female
+                    education_stage: undergraduate
+                    living_status: dormitory
+                  persona_preference:
+                    persona_id: warm-doctor-01
+                    style: warm
+                    voice_preference: female-soft
+                  assessment_summary:
+                    available: true
+                    scale_type: PHQ-9
+                    total_score: 16
+                    severity: moderately_severe
+                    confidence: 0.95
+                    summary: PHQ-9 得分较高，近两周抑郁症状较明显
+                    self_harm_item_positive: false
+                    structured_flags:
+                      - sleep_problem
+                      - low_mood
+                  text_summary:
+                    available: true
+                    score: 0.44
+                    level: medium
+                    confidence: 0.73
+                    summary: 用户补充提到近期学习压力大、睡眠差
+                    keywords:
+                      - 压力大
+                      - 睡眠差
+                  speech_summary:
+                    available: true
+                    score: 0.62
+                    level: medium
+                    confidence: 0.78
+                    label: sad
+                    summary: 语音整体低沉，语速偏慢
+                  emotion_summary:
+                    available: true
+                    score: 0.58
+                    level: medium
+                    confidence: 0.72
+                    label: sad
+                    summary: 表情整体偏消极
+                  eeg_summary:
+                    available: false
+                    score: null
+                    level: null
+                    confidence: null
+                    summary: null
+                  decision_context:
+                    source_page: assessment_result
+                    threshold_version: v1
+                    collected_modalities:
+                      - assessment
+                      - text
+                      - speech
+                      - emotion
+      responses:
+        '200':
+          description: 风险分层成功返回 / Risk stratification success response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskStratificationResponse'
+              examples:
+                continue_to_dialogue:
+                  summary: 中风险，继续进入引导问诊
+                  value:
+                    code: 0
+                    message: ok
+                    data:
+                      result:
+                        risk_level: medium
+                        risk_score: 57
+                        severity_band: medium
+                        referral_recommended: false
+                        emergency_notice: false
+                        allow_continue: true
+                        recommended_next_step: continue_to_dialogue
+                        assessment_confidence: 0.84
+                        triggered_rules: []
+                        evidence_summary:
+                          - source: assessment
+                            signal: phq9_score
+                            detail: 量表结果提示持续情绪困扰
+                          - source: speech
+                            signal: low_arousal_voice
+                            detail: 语音表现出一定低沉和疲惫倾向
+                        contributions:
+                          assessment: 0.74
+                          text: 0.08
+                          speech: 0.10
+                          emotion: 0.08
+                          eeg: 0.0
+                        safety_advice:
+                          headline: 建议继续完成引导问诊，以补充近期状态和需求信息
+                          actions:
+                            - 保持后续问诊流程
+                            - 继续观察睡眠与情绪波动
+                        threshold_snapshot:
+                          referral_threshold: high
+                          emergency_threshold: urgent
+                    request_id: req-20260402-risk-001
+                    timestamp: '2026-04-02T10:30:00+08:00'
+                referral_recommended_but_continue:
+                  summary: 高风险，优先建议就医但允许继续体验
+                  value:
+                    code: 1001
+                    message: referral_recommended
+                    data:
+                      result:
+                        risk_level: high
+                        risk_score: 78
+                        severity_band: high
+                        referral_recommended: true
+                        emergency_notice: false
+                        allow_continue: true
+                        recommended_next_step: continue_with_strong_warning
+                        assessment_confidence: 0.88
+                        triggered_rules:
+                          - rule_id: phq9_high_score
+                            reason: PHQ-9 总分进入较高风险区间
+                          - rule_id: multimodal_negative_consensus
+                            reason: 语音与表情结果共同提示明显低落
+                        evidence_summary:
+                          - source: assessment
+                            signal: severe_scale_signal
+                            detail: 量表结果已达到较高风险区间
+                          - source: emotion
+                            signal: negative_affect_cluster
+                            detail: 多模态结果共同提示明显异常
+                        contributions:
+                          assessment: 0.70
+                          text: 0.06
+                          speech: 0.12
+                          emotion: 0.12
+                          eeg: 0.0
+                        safety_advice:
+                          headline: 建议优先寻求专业帮助，系统调控仅作为辅助支持
+                          actions:
+                            - 优先联系心理老师、医生或可信赖照护者
+                            - 如愿意，仍可继续完成引导问诊和后续调控体验
+                        threshold_snapshot:
+                          referral_threshold: high
+                          emergency_threshold: urgent
+                    request_id: req-20260402-risk-002
+                    timestamp: '2026-04-02T10:32:00+08:00'
+        '400':
+          description: 风险评估请求参数错误 / Risk assessment bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                missing_assessment_summary:
+                  summary: 缺少量表摘要
+                  value:
+                    code: 4001
+                    message: 'missing required field: assessment_summary'
+                    data:
+                      field: assessment_summary
+                      module: risk-assessment
+                      capability: risk-stratification
+                    request_id: req-20260402-risk-003
+                    timestamp: '2026-04-02T10:35:00+08:00'
+                invalid_assessment_payload:
+                  summary: 量表摘要字段不完整
+                  value:
+                    code: 4002
+                    message: 'invalid field format: assessment_summary.total_score is required when available=true'
+                    data:
+                      field: assessment_summary.total_score
+                      module: risk-assessment
+                      capability: risk-stratification
+                    request_id: req-20260402-risk-004
+                    timestamp: '2026-04-02T10:36:00+08:00'
+        '401':
+          description: 风险评估接口鉴权失败 / Risk assessment unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 4003
+                message: auth failed
+                data:
+                  module: risk-assessment
+                  capability: risk-stratification
+                  reason: login required before risk assessment
+                request_id: req-20260402-risk-005
+                timestamp: '2026-04-02T10:37:00+08:00'
+        '500':
+          description: 风险评估内部计算异常 / Risk assessment internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 5001
+                message: risk stratification engine failed
+                data:
+                  module: risk-assessment
+                  capability: risk-stratification
+                  stage: rule_evaluation
+                request_id: req-20260402-risk-006
+                timestamp: '2026-04-02T10:38:00+08:00'
+        '503':
+          description: 风险评估服务未就绪 / Risk assessment unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                threshold_not_ready:
+                  summary: 阈值配置未加载
+                  value:
+                    code: 7001
+                    message: threshold config not loaded
+                    data:
+                      module: risk-assessment
+                      capability: risk-stratification
+                      required_resource: threshold_config_v1
+                    request_id: req-20260402-risk-007
+                    timestamp: '2026-04-02T10:39:00+08:00'
+                upstream_unavailable:
+                  summary: 上游依赖不可用
+                  value:
+                    code: 6001
+                    message: upstream service unavailable
+                    data:
+                      module: risk-assessment
+                      capability: risk-stratification
+                      upstream: profile-store
+                    request_id: req-20260402-risk-008
+                    timestamp: '2026-04-02T10:40:00+08:00'
+
+  /api/v1/risk-assessment/risk-stratification/health:
+    get:
+      tags:
+        - risk-assessment
+      summary: 初步风险分层与安全建议能力健康检查接口
+      operationId: riskAssessmentRiskStratificationHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/risk-assessment/risk-stratification/meta:
+    get:
+      tags:
+        - risk-assessment
+      summary: 初步风险分层与安全建议能力元信息接口
+      operationId: riskAssessmentRiskStratificationMeta
+      responses:
+        '200':
+          description: 风险评估模块元信息返回 / Risk assessment meta response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskAssessmentMetaResponse'
+              example:
+                code: 0
+                message: ok
+                data:
+                  module: risk-assessment
+                  capability: risk-stratification
+                  module_zh: 风险评估与安全建议模块
+                  capability_zh: 初步风险分层与安全建议能力
+                  version: v1
+                  owner: team-risk
+                  input_schema_version: 1.0.0
+                  output_schema_version: 1.0.0
+                  supports_mock: true
+                  engine_type: rule_engine_v1_scale_first
+                  primary_signal: assessment
+                  secondary_signals:
+                    - text
+                    - speech
+                    - emotion
+                    - eeg
+                  risk_levels_supported:
+                    - low
+                    - medium
+                    - high
+                    - urgent
+                  advisory_codes:
+                    - 1001
+                  threshold_policy:
+                    referral_threshold: high
+                    emergency_threshold: urgent
+                    non_blocking_flow: true
+                    allow_continue_default: true
+                    assessment_primary: true
+                    scale_rules:
+                      PHQ-9:
+                        medium_threshold: 10
+                        high_threshold: 15
+                        self_harm_item_score_high: 1
+                        self_harm_item_score_urgent: 2
+                      GAD-7:
+                        medium_threshold: 10
+                        high_threshold: 15
+                      SDS:
+                        medium_threshold: 53
+                        high_threshold: 63
+                        score_type: standard_score
+                    multimodal_uplift:
+                      enabled: true
+                      min_high_modalities: 2
+                      high_score_threshold: 70
+                      min_confidence: 0.7
+                      max_target_band: high
+                  output_contract:
+                    required_fields:
+                      - risk_level
+                      - risk_score
+                      - referral_recommended
+                      - emergency_notice
+                      - allow_continue
+                      - recommended_next_step
+                request_id: req-20260402-risk-meta-001
+                timestamp: '2026-04-02T10:41:00+08:00'
+
+  /api/v1/intervention/intervention-decision/plan:
+    post:
+      tags:
+        - intervention
+      summary: 个性化调控决策能力主接口
+      operationId: interventionInterventionDecisionPlan
+      description: |
+        `intervention-decision（个性化调控决策能力）` 的主接口。
+        用于在完成引导问诊、补全用户画像之后，
+        根据风险分层结果、用户偏好和可用内容资源，
+        选择最适合的音乐、视频、文字故事或其他调控方式，并返回执行方案。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InterventionDecisionPlanRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/intervention/intervention-decision/health:
+    get:
+      tags:
+        - intervention
+      summary: 个性化调控决策能力健康检查接口
+      operationId: interventionInterventionDecisionHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/intervention/intervention-decision/meta:
+    get:
+      tags:
+        - intervention
+      summary: 个性化调控决策能力元信息接口
+      operationId: interventionInterventionDecisionMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/history-report/record-reporting/generate:
+    post:
+      tags:
+        - history-report
+      summary: 记录与报告能力主接口
+      operationId: historyReportRecordReportingGenerate
+      description: |
+        `record-reporting（记录与报告能力）` 的主接口。
+        用于生成阶段性报告、趋势报告或单次评估报告。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordReportingGenerateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '500':
+          $ref: '#/components/responses/Error500'
+
+  /api/v1/history-report/record-reporting/health:
+    get:
+      tags:
+        - history-report
+      summary: 记录与报告能力健康检查接口
+      operationId: historyReportRecordReportingHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/history-report/record-reporting/meta:
+    get:
+      tags:
+        - history-report
+      summary: 记录与报告能力元信息接口
+      operationId: historyReportRecordReportingMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+  /api/v1/admin-settings/system-ops/update:
+    post:
+      tags:
+        - admin-settings
+      summary: 系统管理与配置能力主接口
+      operationId: adminSettingsSystemOpsUpdate
+      description: |
+        `system-ops（系统管理与配置能力）` 的主接口。
+        用于更新系统配置、调试开关和后台运行参数。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SystemOpsUpdateRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/StandardSuccess'
+        '400':
+          $ref: '#/components/responses/Error400'
+        '401':
+          $ref: '#/components/responses/Error401'
+        '409':
+          $ref: '#/components/responses/Error409'
+        '500':
+          $ref: '#/components/responses/Error500'
+
+  /api/v1/admin-settings/system-ops/health:
+    get:
+      tags:
+        - admin-settings
+      summary: 系统管理与配置能力健康检查接口
+      operationId: adminSettingsSystemOpsHealth
+      responses:
+        '200':
+          $ref: '#/components/responses/HealthSuccess'
+        '503':
+          $ref: '#/components/responses/Error503'
+
+  /api/v1/admin-settings/system-ops/meta:
+    get:
+      tags:
+        - admin-settings
+      summary: 系统管理与配置能力元信息接口
+      operationId: adminSettingsSystemOpsMeta
+      responses:
+        '200':
+          $ref: '#/components/responses/MetaSuccess'
+
+components:
+  responses:
+    StandardSuccess:
+      description: 标准成功返回 / Standard success response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/StandardResponse'
+          example:
+            code: 0
+            message: ok
+            data:
+              result:
+                status: success
+            request_id: req-20260401-001
+            timestamp: '2026-04-01T15:30:00+08:00'
+
+    HealthSuccess:
+      description: 健康检查成功返回 / Health success response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HealthResponse'
+          example:
+            code: 0
+            message: ok
+            data:
+              status: up
+              mode: mock
+              model_loaded: false
+              version: v1
+            request_id: req-20260401-002
+            timestamp: '2026-04-01T15:31:00+08:00'
+
+    MetaSuccess:
+      description: 元信息成功返回 / Meta success response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MetaResponse'
+          example:
+            code: 0
+            message: ok
+            data:
+              module: speech
+              capability: speech-transcribe
+              module_zh: 语音处理模块
+              capability_zh: 语音转写能力
+              version: v1
+              owner: team-a
+              input_schema_version: 1.0.0
+              output_schema_version: 1.0.0
+              supports_mock: true
+            request_id: req-20260401-003
+            timestamp: '2026-04-01T15:32:00+08:00'
+
+    Error400:
+      description: 请求参数错误 / Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 4001
+            message: missing required field
+            data: null
+            request_id: req-20260401-004
+            timestamp: '2026-04-01T15:33:00+08:00'
+
+    Error401:
+      description: 鉴权失败 / Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 4003
+            message: auth failed
+            data: null
+            request_id: req-20260401-005
+            timestamp: '2026-04-01T15:34:00+08:00'
+
+    Error409:
+      description: 状态冲突 / Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 4009
+            message: operation not allowed in current state
+            data: null
+            request_id: req-20260401-006
+            timestamp: '2026-04-01T15:35:00+08:00'
+
+    Error500:
+      description: 服务内部异常 / Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 5001
+            message: internal service error
+            data: null
+            request_id: req-20260401-007
+            timestamp: '2026-04-01T15:36:00+08:00'
+
+    Error503:
+      description: 服务未就绪或模型未加载 / Service unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: 7001
+            message: model not loaded
+            data: null
+            request_id: req-20260401-008
+            timestamp: '2026-04-01T15:37:00+08:00'
+
+  schemas:
+    StandardResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - request_id
+        - timestamp
+      properties:
+        code:
+          type: integer
+          description: 业务状态码 / Business code
+          example: 0
+        message:
+          type: string
+          description: 人类可读信息 / Human-readable message
+          example: ok
+        data:
+          type: object
+          description: 业务结果主体 / Business data
+          additionalProperties: true
+        request_id:
+          type: string
+          description: 请求唯一标识 / Request identifier
+          example: req-20260401-001
+        timestamp:
+          type: string
+          format: date-time
+          description: 响应时间，统一使用 ISO 8601（国际时间格式）
+          example: '2026-04-01T15:30:00+08:00'
+
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - request_id
+        - timestamp
+      properties:
+        code:
+          type: integer
+          description: 非 0 业务错误码 / Non-zero business error code
+          example: 4001
+        message:
+          type: string
+          description: 错误描述 / Error message
+          example: missing required field
+        data:
+          type: object
+          nullable: true
+          description: 失败时通常为 null
+          additionalProperties: true
+          example: null
+        request_id:
+          type: string
+          description: 请求唯一标识 / Request identifier
+          example: req-20260401-004
+        timestamp:
+          type: string
+          format: date-time
+          description: 响应时间 / Response timestamp
+          example: '2026-04-01T15:33:00+08:00'
+
+    HealthResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - request_id
+        - timestamp
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/HealthData'
+        request_id:
+          type: string
+          example: req-20260401-002
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-04-01T15:31:00+08:00'
+
+    HealthData:
+      type: object
+      required:
+        - status
+        - mode
+        - model_loaded
+        - version
+      properties:
+        status:
+          type: string
+          description: 服务状态 / Service status
+          example: up
+        mode:
+          type: string
+          description: 当前模式 / Current mode
+          enum:
+            - mock
+            - prod
+          example: mock
+        model_loaded:
+          type: boolean
+          description: 模型是否已加载 / Whether model is loaded
+          example: false
+        version:
+          type: string
+          description: 模块版本 / Module version
+          example: v1
+
+    MetaResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - request_id
+        - timestamp
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/MetaData'
+        request_id:
+          type: string
+          example: req-20260401-003
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-04-01T15:32:00+08:00'
+
+    MetaData:
+      type: object
+      required:
+        - module
+        - capability
+        - module_zh
+        - capability_zh
+        - version
+        - input_schema_version
+        - output_schema_version
+        - supports_mock
+      properties:
+        module:
+          type: string
+          description: 一级模块英文名 / Top-level module name
+          example: speech
+        capability:
+          type: string
+          description: 二级能力英文名 / Capability name
+          example: speech-transcribe
+        module_zh:
+          type: string
+          description: 一级模块中文名
+          example: 语音处理模块
+        capability_zh:
+          type: string
+          description: 二级能力中文名
+          example: 语音转写能力
+        version:
+          type: string
+          description: 接口版本 / API version
+          example: v1
+        owner:
+          type: string
+          description: 负责人或小组 / Owner or team
+          example: team-a
+        input_schema_version:
+          type: string
+          description: 输入结构版本 / Input schema version
+          example: 1.0.0
+        output_schema_version:
+          type: string
+          description: 输出结构版本 / Output schema version
+          example: 1.0.0
+        supports_mock:
+          type: boolean
+          description: 是否支持 Mock（模拟）模式
+          example: true
+
+    MessageItem:
+      type: object
+      required:
+        - role
+        - content
+      properties:
+        role:
+          type: string
+          enum:
+            - system
+            - user
+            - assistant
+          description: 对话角色 / Conversation role
+        content:
+          type: string
+          description: 消息内容 / Message content
+
+    AnswerItem:
+      type: object
+      required:
+        - question_id
+        - answer_value
+      properties:
+        question_id:
+          type: string
+          description: 题目编号 / Question identifier
+          example: phq9_q1
+        answer_value:
+          type: integer
+          description: 答案值 / Answer value
+          example: 2
+        answer_text:
+          type: string
+          description: 答案文本 / Answer text
+          example: 一半以上天数
+
+    ScaleDraftPayload:
+      type: object
+      properties:
+        draft_id:
+          type: integer
+          description: 草稿记录 ID / Draft identifier
+          example: 12
+        scale_slug:
+          type: string
+          description: 量表英文标识 / Scale slug
+          example: phq9
+        flow_session_id:
+          type: string
+          nullable: true
+          description: 量表流程会话标识 / Screening flow session identifier
+          example: flow-123456
+        answers:
+          type: object
+          description: 当前已保存的答案 / Persisted answers
+          additionalProperties:
+            type: integer
+          example:
+            q1: 1
+            q2: 2
+        answered_count:
+          type: integer
+          description: 已完成题数 / Answered item count
+          example: 2
+        current_item_index:
+          type: integer
+          description: 最近作答位置，从 0 开始 / Last answered item index
+          example: 1
+        started_at:
+          type: integer
+          nullable: true
+          description: 开始作答时间戳 / Start timestamp
+          example: 1712050000
+        saved_use_time:
+          type: integer
+          description: 当前累计用时，单位秒 / Saved elapsed time in seconds
+          example: 42
+        status:
+          type: string
+          description: 草稿状态 / Draft status
+          example: draft
+        updated_at:
+          type: string
+          format: date-time
+          description: 最近更新时间 / Last updated time
+          example: '2026-04-02T19:15:00+08:00'
+
+    ScaleDraftResponseData:
+      type: object
+      properties:
+        draft:
+          allOf:
+            - $ref: '#/components/schemas/ScaleDraftPayload'
+          nullable: true
+        flow_session:
+          type: object
+          nullable: true
+          description: 流程会话摘要 / Flow session summary
+          additionalProperties: true
+
+    ScaleDraftResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - request_id
+        - timestamp
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/ScaleDraftResponseData'
+        request_id:
+          type: string
+          example: req-20260402-draft-001
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-04-02T19:15:00+08:00'
+
+    AnalysisSummary:
+      type: object
+      description: 模块摘要结果 / Module summary result
+      additionalProperties: true
+
+    RiskAssessmentUserProfile:
+      type: object
+      description: 风险评估阶段使用的建档基础信息与初始画像 / Intake profile for risk assessment
+      properties:
+        age_group:
+          type: string
+          description: 年龄段 / Age group
+          example: 18-25
+        gender:
+          type: string
+          description: 性别 / Gender
+          example: female
+        education_stage:
+          type: string
+          description: 教育阶段 / Education stage
+          example: undergraduate
+        living_status:
+          type: string
+          description: 居住状态 / Living status
+          example: dormitory
+        known_history:
+          type: array
+          description: 已知既往情况 / Known history
+          items:
+            type: string
+
+    PersonaPreferenceSummary:
+      type: object
+      description: 虚拟医生与交互偏好摘要 / Persona preference summary
+      properties:
+        persona_id:
+          type: string
+          description: 虚拟医生编号 / Persona identifier
+          example: warm-doctor-01
+        style:
+          type: string
+          description: 交互风格 / Interaction style
+          example: warm
+        voice_preference:
+          type: string
+          description: 语音偏好 / Voice preference
+          example: female-soft
+
+    AssessmentRiskSummary:
+      type: object
+      required:
+        - available
+      properties:
+        available:
+          type: boolean
+          description: 当前量表摘要是否可用 / Whether assessment summary is available
+          example: true
+        scale_type:
+          type: string
+          description: 量表类型 / Scale type
+          example: PHQ-9
+        total_score:
+          type: number
+          nullable: true
+          description: 量表总分 / Total assessment score
+          example: 16
+        severity:
+          type: string
+          nullable: true
+          description: 量表严重程度标签 / Severity label
+          example: moderately_severe
+        confidence:
+          type: number
+          format: float
+          nullable: true
+          description: 量表结果置信度 / Confidence
+          example: 0.95
+        summary:
+          type: string
+          nullable: true
+          description: 量表摘要说明 / Assessment summary
+          example: PHQ-9 得分较高，近两周抑郁症状较明显
+        self_harm_item_positive:
+          type: boolean
+          nullable: true
+          description: 自伤相关题项是否阳性 / Whether self-harm related item is positive
+          example: false
+        structured_flags:
+          type: array
+          description: 结构化风险标记 / Structured flags
+          items:
+            type: string
+          example:
+            - sleep_problem
+            - low_mood
+
+    ModalitySignalSummary:
+      type: object
+      required:
+        - available
+      properties:
+        available:
+          type: boolean
+          description: 模态结果是否可用 / Whether modality result is available
+          example: true
+        score:
+          type: number
+          format: float
+          nullable: true
+          description: 归一化模态分数 / Normalized modality score
+          example: 0.62
+        level:
+          type: string
+          nullable: true
+          description: 模态等级标签 / Modality level label
+          example: medium
+        confidence:
+          type: number
+          format: float
+          nullable: true
+          description: 模态置信度 / Modality confidence
+          example: 0.78
+        label:
+          type: string
+          nullable: true
+          description: 主标签 / Dominant label
+          example: sad
+        summary:
+          type: string
+          nullable: true
+          description: 模态摘要说明 / Modality summary
+          example: 语音整体低沉，语速偏慢
+        keywords:
+          type: array
+          description: 关键词列表 / Keyword list
+          items:
+            type: string
+          example:
+            - 压力大
+            - 睡眠差
+
+    RiskStratificationContext:
+      type: object
+      description: 初步风险分层上下文 / Risk stratification context
+      properties:
+        source_page:
+          type: string
+          description: 来源页面 / Source page
+          example: assessment_result
+        threshold_version:
+          type: string
+          description: 阈值版本 / Threshold version
+          example: v1
+        collected_modalities:
+          type: array
+          description: 当前已采集的模态 / Collected modalities
+          items:
+            type: string
+            enum:
+              - assessment
+              - text
+              - speech
+              - emotion
+              - eeg
+          example:
+            - assessment
+            - text
+            - speech
+            - emotion
+
+    RiskTriggeredRule:
+      type: object
+      required:
+        - rule_id
+        - reason
+      properties:
+        rule_id:
+          type: string
+          description: 规则编号 / Rule identifier
+          example: phq9_high_score
+        reason:
+          type: string
+          description: 规则触发原因 / Rule trigger reason
+          example: PHQ-9 总分进入较高风险区间
+
+    RiskEvidenceItem:
+      type: object
+      required:
+        - source
+        - signal
+        - detail
+      properties:
+        source:
+          type: string
+          description: 证据来源模块 / Evidence source
+          example: assessment
+        signal:
+          type: string
+          description: 信号名称 / Signal name
+          example: phq9_score
+        detail:
+          type: string
+          description: 证据说明 / Evidence detail
+          example: 量表结果提示持续情绪困扰
+
+    RiskSafetyAdvice:
+      type: object
+      properties:
+        headline:
+          type: string
+          description: 安全建议主提示 / Safety advice headline
+          example: 建议继续完成引导问诊，以补充近期状态和需求信息
+        actions:
+          type: array
+          description: 建议动作列表 / Suggested actions
+          items:
+            type: string
+
+    RiskThresholdSnapshot:
+      type: object
+      properties:
+        referral_threshold:
+          type: string
+          description: 就医建议阈值 / Referral threshold
+          example: high
+        emergency_threshold:
+          type: string
+          description: 紧急提示阈值 / Emergency threshold
+          example: urgent
+
+    RiskStratificationResult:
+      type: object
+      required:
+        - risk_level
+        - risk_score
+        - severity_band
+        - referral_recommended
+        - emergency_notice
+        - allow_continue
+        - recommended_next_step
+      properties:
+        risk_level:
+          type: string
+          description: 风险等级 / Risk level
+          enum:
+            - low
+            - medium
+            - high
+            - urgent
+          example: medium
+        risk_score:
+          type: integer
+          description: 风险分数，范围 0-100 / Risk score from 0 to 100
+          example: 57
+        severity_band:
+          type: string
+          description: 风险挡位 / Severity band
+          enum:
+            - low
+            - medium
+            - high
+            - urgent
+          example: medium
+        referral_recommended:
+          type: boolean
+          description: 是否建议优先寻求专业帮助 / Whether referral is recommended
+          example: false
+        emergency_notice:
+          type: boolean
+          description: 是否触发紧急提示 / Whether emergency notice is triggered
+          example: false
+        allow_continue:
+          type: boolean
+          description: 是否允许继续后续体验 / Whether flow can continue
+          example: true
+        recommended_next_step:
+          type: string
+          description: 推荐下一步 / Recommended next step
+          enum:
+            - continue_to_dialogue
+            - continue_with_strong_warning
+            - seek_professional_help_first
+            - seek_emergency_support_now
+          example: continue_to_dialogue
+        assessment_confidence:
+          type: number
+          format: float
+          description: 评估置信度 / Assessment confidence
+          example: 0.84
+        triggered_rules:
+          type: array
+          description: 触发规则列表 / Triggered rules
+          items:
+            oneOf:
+              - type: string
+              - $ref: '#/components/schemas/RiskTriggeredRule'
+        evidence_summary:
+          type: array
+          description: 证据摘要 / Evidence summary
+          items:
+            $ref: '#/components/schemas/RiskEvidenceItem'
+        contributions:
+          type: object
+          description: 各模态贡献占比 / Contributions by modality
+          additionalProperties:
+            type: number
+            format: float
+          example:
+            assessment: 0.74
+            speech: 0.10
+            emotion: 0.08
+            eeg: 0.0
+        safety_advice:
+          $ref: '#/components/schemas/RiskSafetyAdvice'
+        threshold_snapshot:
+          $ref: '#/components/schemas/RiskThresholdSnapshot'
+
+    RiskStratificationResponseData:
+      type: object
+      required:
+        - result
+      properties:
+        result:
+          $ref: '#/components/schemas/RiskStratificationResult'
+
+    RiskStratificationResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - request_id
+        - timestamp
+      properties:
+        code:
+          type: integer
+          description: 业务状态码，成功为 0，高风险提醒可使用 1xxx / Business code
+          example: 0
+        message:
+          type: string
+          description: 人类可读信息 / Human-readable message
+          example: ok
+        data:
+          $ref: '#/components/schemas/RiskStratificationResponseData'
+        request_id:
+          type: string
+          description: 请求唯一标识 / Request identifier
+          example: req-20260402-risk-001
+        timestamp:
+          type: string
+          format: date-time
+          description: 响应时间 / Response timestamp
+          example: '2026-04-02T10:30:00+08:00'
+
+    RiskAssessmentThresholdPolicy:
+      type: object
+      properties:
+        referral_threshold:
+          type: string
+          description: 就医建议阈值 / Referral threshold
+          example: high
+        emergency_threshold:
+          type: string
+          description: 紧急提示阈值 / Emergency threshold
+          example: urgent
+        non_blocking_flow:
+          type: boolean
+          description: 是否采用不阻断流程策略 / Whether non-blocking flow is enabled
+          example: true
+        allow_continue_default:
+          type: boolean
+          description: 默认是否允许继续后续体验 / Default allow continue flag
+          example: true
+        assessment_primary:
+          type: boolean
+          description: 是否采用量表主导策略 / Whether assessment-first strategy is enabled
+          example: true
+        scale_rules:
+          type: object
+          description: 各量表阈值定义 / Per-scale thresholds
+          additionalProperties: true
+        multimodal_uplift:
+          type: object
+          description: 多模态保守升档策略 / Conservative multimodal uplift policy
+          additionalProperties: true
+
+    RiskAssessmentOutputContract:
+      type: object
+      properties:
+        required_fields:
+          type: array
+          description: 返回结果中要求固定出现的字段 / Required fields in output
+          items:
+            type: string
+          example:
+            - risk_level
+            - risk_score
+            - referral_recommended
+            - emergency_notice
+            - allow_continue
+            - recommended_next_step
+
+    RiskAssessmentMetaData:
+      type: object
+      required:
+        - module
+        - capability
+        - module_zh
+        - capability_zh
+        - version
+        - input_schema_version
+        - output_schema_version
+        - supports_mock
+      properties:
+        module:
+          type: string
+          example: risk-assessment
+        capability:
+          type: string
+          example: risk-stratification
+        module_zh:
+          type: string
+          example: 风险评估与安全建议模块
+        capability_zh:
+          type: string
+          example: 初步风险分层与安全建议能力
+        version:
+          type: string
+          example: v1
+        owner:
+          type: string
+          example: team-risk
+        input_schema_version:
+          type: string
+          example: 1.0.0
+        output_schema_version:
+          type: string
+          example: 1.0.0
+        supports_mock:
+          type: boolean
+          example: true
+        engine_type:
+          type: string
+          description: 当前内部决策内核类型 / Decision core type
+          example: rule_engine_v1_scale_first
+        primary_signal:
+          type: string
+          description: 当前主判定信号 / Primary signal
+          example: assessment
+        secondary_signals:
+          type: array
+          description: 当前增强判定信号 / Secondary signals
+          items:
+            type: string
+          example:
+            - text
+            - speech
+            - emotion
+            - eeg
+        risk_levels_supported:
+          type: array
+          description: 支持的风险分层挡位 / Supported risk levels
+          items:
+            type: string
+            enum:
+              - low
+              - medium
+              - high
+              - urgent
+        advisory_codes:
+          type: array
+          description: 成功但带提醒的业务码 / Advisory business codes
+          items:
+            type: integer
+          example:
+            - 1001
+        threshold_policy:
+          $ref: '#/components/schemas/RiskAssessmentThresholdPolicy'
+        output_contract:
+          $ref: '#/components/schemas/RiskAssessmentOutputContract'
+
+    RiskAssessmentMetaResponse:
+      type: object
+      required:
+        - code
+        - message
+        - data
+        - request_id
+        - timestamp
+      properties:
+        code:
+          type: integer
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          $ref: '#/components/schemas/RiskAssessmentMetaData'
+        request_id:
+          type: string
+          example: req-20260402-risk-meta-001
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-04-02T10:41:00+08:00'
+
+    LoginRequest:
+      type: object
+      required:
+        - login_type
+        - identifier
+      properties:
+        login_type:
+          type: string
+          description: 登录类型 / Login type
+          enum:
+            - username
+            - student_id
+            - phone
+          example: username
+        identifier:
+          type: string
+          description: 登录标识 / Login identifier
+          example: demo_user
+        password:
+          type: string
+          description: 密码 / Password
+          example: '123456'
+        verification_code:
+          type: string
+          description: 验证码 / Verification code
+          example: '728451'
+
+    PersonaSelectRequest:
+      type: object
+      required:
+        - user_id
+        - persona_id
+      properties:
+        user_id:
+          type: string
+          description: 用户 ID / User identifier
+          example: user-1001
+        persona_id:
+          type: string
+          description: 虚拟医生编号 / Persona identifier
+          example: warm-doctor-01
+        style_preference:
+          type: string
+          description: 风格偏好 / Style preference
+          example: warm
+        voice_preference:
+          type: string
+          description: 语音播报偏好 / Voice preference
+          example: female-soft
+
+    AssessmentSubmitRequest:
+      type: object
+      required:
+        - scale_slug
+        - answers
+      properties:
+        session_id:
+          type: string
+          description: 会话 ID / Session identifier
+          example: sess-001
+        scale_slug:
+          type: string
+          description: 量表英文标识 / Scale slug
+          enum:
+            - phq9
+            - gad7
+          example: phq9
+        flow_session_id:
+          type: string
+          nullable: true
+          description: 量表流程会话标识 / Screening flow session identifier
+          example: flow-123456
+        started_at:
+          type: integer
+          nullable: true
+          description: 开始作答时间戳 / Start timestamp
+          example: 1712050000
+        use_time:
+          type: integer
+          nullable: true
+          description: 前端累计作答用时，单位秒 / Elapsed time in seconds
+          example: 86
+        answers:
+          type: array
+          description: 量表答案列表 / Scale answers
+          items:
+            $ref: '#/components/schemas/AnswerItem'
+        collect_modalities:
+          type: array
+          description: 作答时同步采集的模态 / Modalities collected during answering
+          items:
+            type: string
+            enum:
+              - text
+              - speech
+              - emotion
+              - eeg
+          example:
+            - speech
+            - emotion
+            - eeg
+
+    ScaleDraftSaveRequest:
+      type: object
+      required:
+        - scale_slug
+        - answers
+      properties:
+        scale_slug:
+          type: string
+          description: 量表英文标识 / Scale slug
+          enum:
+            - phq9
+            - gad7
+          example: phq9
+        flow_session_id:
+          type: string
+          nullable: true
+          description: 量表流程会话标识 / Screening flow session identifier
+          example: flow-123456
+        started_at:
+          type: integer
+          nullable: true
+          description: 开始作答时间戳 / Start timestamp
+          example: 1712050000
+        use_time:
+          type: integer
+          description: 当前累计作答用时，单位秒 / Elapsed time in seconds
+          example: 42
+        current_item_index:
+          type: integer
+          description: 最近作答位置，从 0 开始 / Last answered item index
+          example: 2
+        answers:
+          type: object
+          description: 当前已作答题目 / Current answers
+          additionalProperties:
+            type: integer
+          example:
+            q1: 1
+            q2: 2
+
+    GuidedConversationRunRequest:
+      type: object
+      required:
+        - user_id
+        - session_id
+        - user_input
+      properties:
+        user_id:
+          type: string
+          description: 用户 ID / User identifier
+          example: user-1001
+        session_id:
+          type: string
+          description: 会话 ID / Session identifier
+          example: sess-002
+        conversation_stage:
+          type: string
+          description: 当前问诊阶段 / Conversation stage
+          enum:
+            - post_risk_stratification
+            - profile_completion
+            - clarification
+            - intervention_precheck
+          example: profile_completion
+        user_input:
+          type: string
+          description: 当前输入文本 / Current user input
+          example: 我最近晚上很难睡着，而且觉得很压抑
+        history:
+          type: array
+          description: 历史消息 / Conversation history
+          items:
+            $ref: '#/components/schemas/MessageItem'
+
+    SpeechTranscribeRunRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: 用户 ID / User identifier
+          example: user-1001
+        session_id:
+          type: string
+          description: 会话 ID / Session identifier
+          example: sess-003
+        audio_url:
+          type: string
+          description: 音频地址 / Audio URL
+          example: https://example.com/audio/demo.wav
+        audio_base64:
+          type: string
+          description: Base64 编码音频 / Base64 encoded audio
+        language_hint:
+          type: string
+          description: 语言提示 / Language hint
+          example: zh
+        dialect_hint:
+          type: string
+          description: 方言提示 / Dialect hint
+          example: sichuan
+
+    SpeechEmotionAnalyzeRequest:
+      type: object
+      required:
+        - user_id
+      properties:
+        user_id:
+          type: string
+          description: 用户 ID / User identifier
+          example: user-1001
+        session_id:
+          type: string
+          description: 会话 ID / Session identifier
+          example: sess-003
+        audio_url:
+          type: string
+          description: 音频地址 / Audio URL
+          example: https://example.com/audio/demo.wav
+        audio_base64:
+          type: string
+          description: Base64 编码音频 / Base64 encoded audio
+        expected_outputs:
+          type: array
+          description: 期望输出项 / Expected outputs
+          items:
+            type: string
+            enum:
+              - emotion_label
+              - confidence
+              - acoustic_features
+          example:
+            - emotion_label
+            - confidence
+            - acoustic_features
+
+    FacialAffectAnalyzeRequest:
+      type: object
+      required:
+        - user_id
+        - session_id
+      properties:
+        user_id:
+          type: string
+          description: 用户 ID / User identifier
+          example: user-1001
+        session_id:
+          type: string
+          description: 会话 ID / Session identifier
+          example: sess-004
+        image_url:
+          type: string
+          description: 图像地址 / Image URL
+          example: https://example.com/frame/frame_001.jpg
+        frame_base64:
+          type: string
+          description: Base64 编码图像帧 / Base64 encoded frame
+        sample_rate:
+          type: integer
+          description: 采样帧率 / Sampling frame rate
+          example: 5
+
+    EegSensingAnalyzeRequest:
+      type: object
+      required:
+        - user_id
+        - session_id
+      properties:
+        user_id:
+          type: string
+          description: 用户 ID / User identifier
+          example: user-1001
+        session_id:
+          type: string
+          description: 会话 ID / Session identifier
+          example: sess-005
+        input_mode:
+          type: string
+          description: 输入模式 / Input mode
+          enum:
+            - snapshot
+            - file
+            - stream_summary
+          example: snapshot
+        data_source:
+          type: string
+          description: 数据来源 / Data source
+          example: lsl
+        duration_sec:
+          type: integer
+          description: 采样时长，单位秒 / Duration in seconds
+          example: 30
+        channels:
+          type: array
+          description: 通道列表 / Channel list
+          items:
+            type: string
+          example:
+            - Fp1
+            - Fp2
+            - Cz
+        feature_summary:
+          type: object
+          description: 预处理特征摘要 / Preprocessed feature summary
+          additionalProperties: true
+
+    RiskStratificationScoreRequest:
+      type: object
+      required:
+        - assessment_summary
+      properties:
+        user_id:
+          type: string
+          description: 用户 ID；如未显式传入，服务端可根据登录会话自动补全 / User identifier
+          example: user-1001
+        session_id:
+          type: string
+          description: 会话 ID / Session identifier
+          example: sess-risk-001
+        user_profile:
+          $ref: '#/components/schemas/RiskAssessmentUserProfile'
+        persona_preference:
+          $ref: '#/components/schemas/PersonaPreferenceSummary'
+        assessment_summary:
+          $ref: '#/components/schemas/AssessmentRiskSummary'
+        text_summary:
+          $ref: '#/components/schemas/ModalitySignalSummary'
+        speech_summary:
+          $ref: '#/components/schemas/ModalitySignalSummary'
+        emotion_summary:
+          $ref: '#/components/schemas/ModalitySignalSummary'
+        eeg_summary:
+          $ref: '#/components/schemas/ModalitySignalSummary'
+        decision_context:
+          $ref: '#/components/schemas/RiskStratificationContext'
+
+    InterventionDecisionPlanRequest:
+      type: object
+      required:
+        - user_id
+        - risk_summary
+        - guided_conversation_summary
+      properties:
+        user_id:
+          type: string
+          description: 用户 ID / User identifier
+          example: user-1001
+        risk_summary:
+          type: object
+          description: 初步风险分层结果 / Risk stratification summary
+          additionalProperties: true
+        user_profile:
+          type: object
+          description: 补全后的用户画像 / Completed user profile
+          additionalProperties: true
+        guided_conversation_summary:
+          type: object
+          description: 引导问诊补全摘要 / Guided conversation summary
+          additionalProperties: true
+        persona_preference:
+          type: object
+          description: 虚拟医生与交互偏好 / Persona preference
+          additionalProperties: true
+        preferences:
+          type: object
+          description: 干预偏好 / Intervention preferences
+          additionalProperties: true
+        constraints:
+          type: object
+          description: 干预约束条件 / Intervention constraints
+          additionalProperties: true
+
+    RecordReportingGenerateRequest:
+      type: object
+      required:
+        - user_id
+        - report_type
+      properties:
+        user_id:
+          type: string
+          description: 用户 ID / User identifier
+          example: user-1001
+        report_type:
+          type: string
+          description: 报告类型 / Report type
+          enum:
+            - single_assessment
+            - stage_summary
+            - trend_report
+          example: stage_summary
+        time_range:
+          type: object
+          description: 时间范围 / Time range
+          properties:
+            start:
+              type: string
+              format: date-time
+              example: '2026-03-01T00:00:00+08:00'
+            end:
+              type: string
+              format: date-time
+              example: '2026-04-01T00:00:00+08:00'
+        include_modules:
+          type: array
+          description: 报告中包含的模块 / Included modules
+          items:
+            type: string
+          example:
+            - assessment
+            - text-dialogue
+            - speech
+            - emotion
+            - eeg
+            - risk-assessment
+
+    SystemOpsUpdateRequest:
+      type: object
+      required:
+        - operator_id
+        - config_scope
+        - updates
+      properties:
+        operator_id:
+          type: string
+          description: 操作人 ID / Operator identifier
+          example: admin-001
+        config_scope:
+          type: string
+          description: 配置范围 / Config scope
+          enum:
+            - api
+            - model
+            - feature_flag
+            - system
+          example: feature_flag
+        updates:
+          type: object
+          description: 更新内容 / Update payload
+          additionalProperties: true
+        reason:
+          type: string
+          description: 变更原因 / Reason for change
+          example: enable mock mode for team integration
+        dry_run:
+          type: boolean
+          description: 是否只做预检查 / Dry run only
+          example: false

@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}{{ scale["short_name"] }} 量表填写{% endblock %}
+{% block title %}{{ scale_short_name or scale_slug|upper }} 量表填写{% endblock %}
 
 {% block breadcrumb %}
 <a href="{{ url_for('scale_assessment.scale_home') }}" class="hover:text-textPrimary">量表筛查</a>
 <i class="fa-solid fa-chevron-right text-[10px]"></i>
-<span class="text-textPrimary font-medium">{{ scale["short_name"] }}</span>
+<span id="breadcrumb-scale-name" class="text-textPrimary font-medium">{{ scale_short_name or scale_slug|upper }}</span>
 {% endblock %}
 
 {% block content %}
@@ -14,70 +14,56 @@
         <div class="px-6 py-6 sm:px-8 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-white">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <p class="text-xs uppercase tracking-[0.18em] text-textTertiary">{{ scale["short_name"] }}</p>
-                    <h1 class="mt-2 text-2xl sm:text-3xl font-bold text-textPrimary">{{ scale["name"] }}</h1>
-                    <p class="mt-3 text-sm text-textSecondary">{{ scale["intro"] }}</p>
+                    <p id="scale-short-name" class="text-xs uppercase tracking-[0.18em] text-textTertiary">{{ scale_short_name or scale_slug|upper }}</p>
+                    <h1 id="scale-name" class="mt-2 text-2xl sm:text-3xl font-bold text-textPrimary">正在加载量表定义...</h1>
+                    <p id="scale-intro" class="mt-3 text-sm text-textSecondary">页面加载后会从统一 API 中拉取量表定义。</p>
+                    {% if flow_session_id %}
+                    <div class="mt-4 inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3 py-1 text-xs font-medium">
+                        <i class="fa-solid fa-arrow-right-arrow-left mr-2"></i>
+                        当前量表已接入本轮筛查流程
+                    </div>
+                    {% endif %}
                 </div>
-                <div class="rounded-2xl bg-[#165DFF]/8 text-[#165DFF] px-4 py-3 text-sm font-medium">
-                    共 {{ scale["items"]|length }} 题
+                <div id="scale-count" class="rounded-2xl bg-[#165DFF]/8 text-[#165DFF] px-4 py-3 text-sm font-medium">
+                    共 0 题
                 </div>
             </div>
         </div>
 
-        <form method="post" action="{{ url_for('scale_assessment.scale_submit', scale_slug=scale["slug"]) }}" class="px-6 py-6 sm:px-8">
-            <input type="hidden" name="started_at" value="{{ started_at }}">
-            <div class="space-y-5">
-                {% for item in scale["items"] %}
-                <section class="rounded-card border border-border bg-slate-50/60 p-5">
-                    <div class="flex items-start gap-3">
-                        <div class="w-9 h-9 shrink-0 rounded-xl bg-[#165DFF]/10 text-[#165DFF] font-semibold flex items-center justify-center">
-                            {{ item.index }}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <h2 class="text-base font-semibold text-textPrimary leading-7">{{ item.text }}</h2>
-                            <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                                {% for option in scale["options"] %}
-                                {% set option_id = scale["slug"] ~ "-" ~ item.id ~ "-" ~ option.value %}
-                                <div class="relative">
-                                    <input
-                                        id="{{ option_id }}"
-                                        type="radio"
-                                        name="{{ item.id }}"
-                                        value="{{ option.value }}"
-                                        class="peer pointer-events-none absolute h-0 w-0 opacity-0"
-                                        tabindex="-1"
-                                        aria-hidden="true"
-                                        required
-                                    >
-                                    <button
-                                        type="button"
-                                        data-radio-target="{{ option_id }}"
-                                        class="block h-full w-full rounded-2xl border border-border bg-white px-4 py-3 text-left transition-all peer-checked:border-[#165DFF] peer-checked:bg-[#165DFF]/8 peer-checked:shadow-sm hover:border-[#165DFF]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#165DFF]/20 focus-visible:ring-offset-2"
-                                    >
-                                        <div class="flex items-center justify-between gap-3">
-                                            <span class="text-sm font-medium text-textPrimary">{{ option.label }}</span>
-                                            <span class="text-xs text-textTertiary">分值 {{ option.value }}</span>
-                                        </div>
-                                        <p class="mt-2 text-xs leading-6 text-textSecondary">{{ option.description }}</p>
-                                    </button>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
+        <form
+            id="scale-form"
+            class="px-6 py-6 sm:px-8"
+            data-scale-slug="{{ scale_slug }}"
+            data-list-url="{{ url_for('scale_assessment.scale_api_list') }}"
+            data-submit-url="{{ url_for('scale_assessment.scale_api_submit') }}"
+            data-draft-url-template="{{ url_for('scale_assessment.scale_api_draft_detail', scale_slug='__SCALE__') }}"
+            data-draft-save-url="{{ url_for('scale_assessment.scale_api_save_draft') }}"
+            data-started-at="{{ started_at }}"
+            data-flow-session-id="{{ flow_session_id }}"
+        >
+            <div id="scale-form-message" class="hidden mb-5"></div>
+            <div id="scale-items" class="space-y-5">
+                <section class="rounded-card border border-dashed border-border bg-slate-50/60 p-5 text-sm text-textSecondary">
+                    正在加载题目...
                 </section>
-                {% endfor %}
             </div>
 
             <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p class="text-sm text-textSecondary">提交后将生成结构化分级结果，并保存到本地数据库。</p>
+                <div>
+                    <p class="text-sm text-textSecondary">提交后将通过统一 API 生成结构化分级结果，并保存到本地数据库。</p>
+                    <p id="scale-draft-status" class="mt-2 text-xs text-textTertiary">草稿暂存未启动</p>
+                </div>
                 <div class="flex gap-3">
                     <a href="{{ url_for('scale_assessment.scale_home') }}"
                        class="px-5 py-3 rounded-btn border border-border text-textSecondary hover:bg-slate-50 transition-colors">
                         返回
                     </a>
-                    <button type="submit"
-                            class="px-6 py-3 rounded-btn bg-[#165DFF] text-white font-medium hover:bg-[#0E42D2] transition-colors shadow-sm">
+                    <button
+                        id="scale-submit-button"
+                        type="submit"
+                        class="px-6 py-3 rounded-btn bg-[#165DFF] text-white font-medium hover:bg-[#0E42D2] transition-colors shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled
+                    >
                         提交并解析
                     </button>
                 </div>
@@ -88,21 +74,345 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/scale_assessment_api.js') }}"></script>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-radio-target]').forEach((button) => {
-        button.addEventListener('mousedown', (event) => {
-            event.preventDefault();
+document.addEventListener('DOMContentLoaded', async () => {
+    const {
+        requestJson,
+        renderStateMessage,
+        hideStateMessage,
+        escapeHtml,
+        buildScaleResultUrl,
+    } = window.ScaleAssessmentApi;
+
+    const form = document.getElementById('scale-form');
+    const scaleSlug = form.dataset.scaleSlug;
+    const listUrl = form.dataset.listUrl;
+    const submitUrl = form.dataset.submitUrl;
+    const draftUrlTemplate = form.dataset.draftUrlTemplate;
+    const draftSaveUrl = form.dataset.draftSaveUrl;
+    const flowSessionId = form.dataset.flowSessionId || null;
+    const itemsContainer = document.getElementById('scale-items');
+    const messageContainer = document.getElementById('scale-form-message');
+    const submitButton = document.getElementById('scale-submit-button');
+    const draftStatus = document.getElementById('scale-draft-status');
+
+    let currentScale = null;
+    let effectiveStartedAt = Number(form.dataset.startedAt || Date.now());
+    let elapsedOffsetSeconds = 0;
+    let draftLoadedAt = Date.now();
+    let lastTouchedIndex = 0;
+    let lastSavedFingerprint = '';
+    let saveTimer = null;
+    let isSavingDraft = false;
+
+    function updateDraftStatus(text, tone = 'muted') {
+        const classMap = {
+            muted: 'text-textTertiary',
+            info: 'text-[#165DFF]',
+            success: 'text-emerald-600',
+            warning: 'text-amber-600',
+            error: 'text-rose-600',
+        };
+        draftStatus.className = `mt-2 text-xs ${classMap[tone] || classMap.muted}`;
+        draftStatus.textContent = text;
+    }
+
+    function buildDraftUrl() {
+        const baseUrl = draftUrlTemplate.replace('__SCALE__', encodeURIComponent(scaleSlug));
+        const query = new URLSearchParams();
+        if (flowSessionId) {
+            query.set('flow_session_id', flowSessionId);
+        }
+        const search = query.toString();
+        return search ? `${baseUrl}?${search}` : baseUrl;
+    }
+
+    function getElapsedSeconds() {
+        return elapsedOffsetSeconds + Math.max(0, Math.floor((Date.now() - draftLoadedAt) / 1000));
+    }
+
+    function collectDraftAnswers() {
+        const answers = {};
+        if (!currentScale) {
+            return answers;
+        }
+
+        currentScale.items.forEach((item, index) => {
+            const checked = form.querySelector(`input[name="${item.id}"]:checked`);
+            if (!checked) {
+                return;
+            }
+            answers[item.id] = Number(checked.value);
+            lastTouchedIndex = Math.max(lastTouchedIndex, index);
+        });
+        return answers;
+    }
+
+    function getDraftFingerprint() {
+        return JSON.stringify({
+            answers: collectDraftAnswers(),
+            use_time: getElapsedSeconds(),
+            current_item_index: lastTouchedIndex,
+            flow_session_id: flowSessionId || null,
+        });
+    }
+
+    function applyDraft(draft) {
+        if (!draft || !draft.answers) {
+            updateDraftStatus('当前没有可恢复的草稿', 'muted');
+            return;
+        }
+
+        Object.entries(draft.answers).forEach(([questionId, value]) => {
+            const input = form.querySelector(`input[name="${questionId}"][value="${value}"]`);
+            if (input) {
+                input.checked = true;
+            }
         });
 
-        button.addEventListener('click', () => {
-            const input = document.getElementById(button.dataset.radioTarget);
-            if (!input) return;
+        effectiveStartedAt = Number(draft.started_at || effectiveStartedAt || Date.now());
+        elapsedOffsetSeconds = Number(draft.saved_use_time || 0);
+        draftLoadedAt = Date.now();
+        lastTouchedIndex = Number(draft.current_item_index || 0);
+        lastSavedFingerprint = getDraftFingerprint();
+        updateDraftStatus(`已恢复草稿，已填写 ${draft.answered_count || 0} 题`, 'success');
+    }
 
-            input.checked = true;
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
+    function scheduleDraftSave(delay = 320) {
+        if (!currentScale) return;
+        if (saveTimer) {
+            window.clearTimeout(saveTimer);
+        }
+        saveTimer = window.setTimeout(() => {
+            persistDraft();
+        }, delay);
+    }
+
+    async function persistDraft({ keepalive = false, force = false } = {}) {
+        if (!currentScale || isSavingDraft) return false;
+
+        const answers = collectDraftAnswers();
+        const answeredCount = Object.keys(answers).length;
+        if (!answeredCount) {
+            updateDraftStatus('当前还没有作答内容，暂不保存草稿', 'muted');
+            return false;
+        }
+
+        const fingerprint = getDraftFingerprint();
+        if (!force && fingerprint === lastSavedFingerprint) {
+            return true;
+        }
+
+        const payload = {
+            scale_slug: currentScale.scale_slug,
+            flow_session_id: flowSessionId,
+            started_at: effectiveStartedAt,
+            use_time: getElapsedSeconds(),
+            current_item_index: lastTouchedIndex,
+            answers,
+        };
+
+        try {
+            isSavingDraft = true;
+            updateDraftStatus('正在自动暂存草稿...', 'info');
+
+            const response = await fetch(draftSaveUrl, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+                keepalive,
+            });
+            const data = await response.json();
+            if (!response.ok || data?.code !== 0) {
+                throw new Error(data?.message || `暂存失败，状态码 ${response.status}`);
+            }
+
+            lastSavedFingerprint = fingerprint;
+            updateDraftStatus(`草稿已自动暂存，当前已填写 ${answeredCount} 题`, 'success');
+            return true;
+        } catch (error) {
+            updateDraftStatus(error.message || '草稿暂存失败', 'error');
+            return false;
+        } finally {
+            isSavingDraft = false;
+        }
+    }
+
+    function renderScale(scale) {
+        currentScale = scale;
+        document.getElementById('breadcrumb-scale-name').textContent = scale.short_name || scale.scale_code || scale.scale_slug;
+        document.getElementById('scale-short-name').textContent = scale.short_name || scale.scale_code || scale.scale_slug;
+        document.getElementById('scale-name').textContent = scale.scale_name;
+        document.getElementById('scale-intro').textContent = scale.intro || '';
+        document.getElementById('scale-count').textContent = `共 ${scale.items.length} 题`;
+        document.title = `${scale.short_name || scale.scale_slug} 量表填写`;
+
+        itemsContainer.innerHTML = scale.items.map((item) => `
+            <section class="rounded-card border border-border bg-slate-50/60 p-5">
+                <div class="flex items-start gap-3">
+                    <div class="w-9 h-9 shrink-0 rounded-xl bg-[#165DFF]/10 text-[#165DFF] font-semibold flex items-center justify-center">
+                        ${escapeHtml(item.index)}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h2 class="text-base font-semibold text-textPrimary leading-7">${escapeHtml(item.text)}</h2>
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                            ${scale.options.map((option) => {
+                                const optionId = `${scale.scale_slug}-${item.id}-${option.value}`;
+                                return `
+                                    <div class="relative">
+                                        <input
+                                            id="${optionId}"
+                                            type="radio"
+                                            name="${escapeHtml(item.id)}"
+                                            value="${escapeHtml(option.value)}"
+                                            class="peer pointer-events-none absolute h-0 w-0 opacity-0"
+                                            tabindex="-1"
+                                            aria-hidden="true"
+                                            required
+                                        >
+                                        <button
+                                            type="button"
+                                            data-radio-target="${optionId}"
+                                            class="block h-full w-full rounded-2xl border border-border bg-white px-4 py-3 text-left transition-all peer-checked:border-[#165DFF] peer-checked:bg-[#165DFF]/8 peer-checked:shadow-sm hover:border-[#165DFF]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#165DFF]/20 focus-visible:ring-offset-2"
+                                        >
+                                            <div class="flex items-center justify-between gap-3">
+                                                <span class="text-sm font-medium text-textPrimary">${escapeHtml(option.label)}</span>
+                                                <span class="text-xs text-textTertiary">分值 ${escapeHtml(option.value)}</span>
+                                            </div>
+                                            <p class="mt-2 text-xs leading-6 text-textSecondary">${escapeHtml(option.description || '')}</p>
+                                        </button>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            </section>
+        `).join('');
+
+        document.querySelectorAll('[data-radio-target]').forEach((button) => {
+            button.addEventListener('mousedown', (event) => event.preventDefault());
+            button.addEventListener('click', () => {
+                const input = document.getElementById(button.dataset.radioTarget);
+                if (!input) return;
+                input.checked = true;
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            });
         });
+
+        document.querySelectorAll('input[type="radio"]').forEach((input) => {
+            input.addEventListener('change', () => {
+                const itemIndex = currentScale.items.findIndex((item) => item.id === input.name);
+                if (itemIndex >= 0) {
+                    lastTouchedIndex = itemIndex;
+                }
+                scheduleDraftSave();
+            });
+        });
+
+        submitButton.disabled = false;
+    }
+
+    try {
+        const payload = await requestJson(`${listUrl}?scale_slug=${encodeURIComponent(scaleSlug)}&include_items=true`);
+        const scale = (payload.data?.items || [])[0];
+        if (!scale) {
+            throw new Error('未找到对应量表定义');
+        }
+        hideStateMessage(messageContainer);
+        renderScale(scale);
+        try {
+            const draftPayload = await requestJson(buildDraftUrl());
+            applyDraft(draftPayload.data?.draft || null);
+        } catch (error) {
+            updateDraftStatus(error.message || '草稿读取失败', 'warning');
+        }
+    } catch (error) {
+        itemsContainer.innerHTML = `
+            <section class="rounded-card border border-dashed border-rose-200 bg-rose-50/60 p-5 text-sm text-rose-700">
+                量表定义加载失败，请返回列表页重试。
+            </section>
+        `;
+        renderStateMessage(messageContainer, 'error', error.message || '量表定义加载失败');
+        return;
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!currentScale) {
+            renderStateMessage(messageContainer, 'error', '量表定义尚未加载完成');
+            return;
+        }
+
+        const answers = [];
+        const missingIndexes = [];
+
+        currentScale.items.forEach((item) => {
+            const checked = form.querySelector(`input[name="${item.id}"]:checked`);
+            if (!checked) {
+                missingIndexes.push(item.index);
+                return;
+            }
+
+            answers.push({
+                question_id: item.id,
+                answer_value: Number(checked.value),
+            });
+        });
+
+        if (missingIndexes.length) {
+            renderStateMessage(
+                messageContainer,
+                'warning',
+                `请先完成所有题目，当前未作答题号：第 ${missingIndexes.join('、')} 题`
+            );
+            return;
+        }
+
+        submitButton.disabled = true;
+        submitButton.textContent = '提交中...';
+        hideStateMessage(messageContainer);
+
+        try {
+            await persistDraft({ force: true });
+            const payload = await requestJson(submitUrl, {
+                method: 'POST',
+                body: JSON.stringify({
+                    scale_slug: currentScale.scale_slug,
+                    session_id: `scale-session-${Date.now()}`,
+                    flow_session_id: flowSessionId,
+                    started_at: Number(effectiveStartedAt),
+                    use_time: getElapsedSeconds(),
+                    answers,
+                }),
+            });
+
+            const recordId = payload.data?.record_id;
+            if (!recordId) {
+                throw new Error('提交成功，但未返回记录 ID');
+            }
+
+            window.location.href = buildScaleResultUrl(recordId, flowSessionId);
+        } catch (error) {
+            renderStateMessage(messageContainer, 'error', error.message || '提交失败，请稍后重试');
+            submitButton.disabled = false;
+            submitButton.textContent = '提交并解析';
+        }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            persistDraft({ keepalive: true });
+        }
+    });
+
+    window.addEventListener('pagehide', () => {
+        persistDraft({ keepalive: true });
     });
 });
 </script>

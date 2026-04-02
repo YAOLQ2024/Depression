@@ -107,6 +107,59 @@ def _ensure_active_test_id(user_id, preferred_test_id=None):
         [1, user_id, now_time, "未完成", 0]
     )
 
+
+def _calculate_sds_result(answers_payload):
+    """统一计算 SDS 标准分、等级与完成状态。"""
+    answer = _answers_payload_to_choice_string(answers_payload)
+    reverse_questions = {2, 5, 6, 11, 12, 14, 16, 17, 18, 20}
+
+    total_raw_score = 0
+    for i in range(1, 21):
+        key = str(i)
+        if key in answers_payload or i in answers_payload:
+            answer_data = answers_payload.get(key) or answers_payload.get(i)
+            value = answer_data['value'] if isinstance(answer_data, dict) else answer_data
+            value = int(value)
+            score = 5 - value if i in reverse_questions else value
+            total_raw_score += score
+
+    standard_score = int(total_raw_score * 1.25)
+
+    if standard_score < 50:
+        result_chinese = "无抑郁"
+    elif 50 <= standard_score <= 60:
+        result_chinese = "轻度抑郁"
+    elif 61 <= standard_score <= 70:
+        result_chinese = "中度抑郁"
+    else:
+        result_chinese = "重度抑郁"
+
+    finish_status = "未完成" if '0' in answer else "已完成"
+    return {
+        "answer": answer,
+        "standard_score": standard_score,
+        "result_chinese": result_chinese,
+        "finish_status": finish_status,
+    }
+
+
+def _build_sds_comprehensive_payload(*, standard_score, emotion_data=None, eeg_data=None):
+    from utils.scoring_system import scoring_system
+
+    emotion_data = emotion_data if isinstance(emotion_data, dict) else {}
+    eeg_data = eeg_data if isinstance(eeg_data, dict) else None
+    comprehensive_result = scoring_system.calculate_comprehensive_score(
+        sds_score=standard_score,
+        emotion_data=emotion_data,
+        eeg_data=eeg_data,
+    )
+    return {
+        "emotion_json": json.dumps(emotion_data) if emotion_data else None,
+        "comprehensive_score": comprehensive_result["comprehensive_score"],
+        "comprehensive_json": json.dumps(comprehensive_result),
+        "comprehensive_result": comprehensive_result,
+    }
+
 # 模块加载完成
 
 try:
@@ -143,6 +196,10 @@ def SDS():
     if not userinfo:
         return redirect('/login')
 
+    flow_session_id = str(request.args.get("flow_session_id") or session.get("sds_flow_session_id") or "").strip()
+    if flow_session_id:
+        session["sds_flow_session_id"] = flow_session_id
+
     test_id = _ensure_active_test_id(userinfo['id'], session.get("test_id"))
     active_test = db.fetch_one(
         "SELECT id, choose, use_time, progress_index FROM test WHERE id = ? AND user_id = ?",
@@ -158,6 +215,7 @@ def SDS():
         'answers': saved_answers,
         'currentQuestionIndex': resume_index,
         'savedUseTime': int(active_test.get('use_time') or 0),
+        'flowSessionId': flow_session_id or None,
     }
 
     return render_template("SDS_working2.html", sds_initial_state=sds_initial_state)
@@ -187,6 +245,25 @@ def SDS_save_progress():
         [answer_string, total_time, progress_index, "未完成", test_id, userinfo['id']]
     )
 
+    flow_session_id = str(session.get("sds_flow_session_id") or "").strip()
+    if flow_session_id:
+        try:
+            from new_features.scale_assessment.flow_service import save_flow_draft
+
+            save_flow_draft(
+                flow_session_id,
+                user_id=userinfo['id'],
+                scale_slug='sds',
+                draft_payload={
+                    'test_id': test_id,
+                    'progress_index': progress_index,
+                    'total_time': total_time,
+                    'answered_count': sum(1 for item in answers.values() if item),
+                },
+            )
+        except Exception as exc:
+            print(f"SDS 草稿挂接 flow session 失败: {exc}")
+
     return jsonify({
         'success': True,
         'test_id': test_id,
@@ -202,60 +279,71 @@ def SDS_submit():
     test_id = _ensure_active_test_id(userinfo['id'], session.get("test_id"))
     session["test_id"] = test_id
 
-    # 获取前端发送的数据
     data = request.get_json(silent=True) or {}
     answers = data.get('answers') or {}
     total_time = max(0, int(data.get('totalTime') or 0))
     finish_time = get_beijing_time()
     progress_index = _clamp_progress_index(data.get('currentQuestionIndex', 19))
+    emotion_data = data.get('emotionData') if isinstance(data.get('emotionData'), dict) else {}
+    eeg_data = data.get('eegData') if isinstance(data.get('eegData'), dict) else None
 
-    # 转为字符串答案answer
-    answer = _answers_payload_to_choice_string(answers)
+    sds_result = _calculate_sds_result(answers)
+    answer = sds_result["answer"]
+    standard_score = sds_result["standard_score"]
+    result_chinese = sds_result["result_chinese"]
+    finish_status = sds_result["finish_status"]
 
-    # 计算分值和抑郁程度
-    # 反向评分题题号（2,5,6,11,12,14,16,17,18,20）
-    reverse_questions = {2, 5, 6, 11, 12, 14, 16, 17, 18, 20}
-
-    total_raw_score = 0
-
-    # 遍历1-20题
-    for i in range(1, 21):
-        key = str(i)
-        if key in answers:
-            answer_data = answers.get(key) or answers.get(i)
-            value = answer_data['value'] if isinstance(answer_data, dict) else answer_data
-            value = int(value)
-            # 检查是否为反向评分题
-            if i in reverse_questions:
-                # 反向评分：4->1, 3->2, 2->3, 1->4
-                score = 5 - value  # 例如value=1时，score=5-1=4
-            else:
-                # 正向评分
-                score = value
-            total_raw_score += score
-        else:
-            # 若某题未回答，默认给0分（也可根据实际情况处理为缺失值）
-            total_raw_score += 0
-
-    # 计算标准分
-    standard_score = int(total_raw_score * 1.25)
-
-    # 根据标准分判断焦虑程度（注意：SDS主要评估抑郁，此处可能是用户口误）
-    if standard_score < 50:
-        anxiety_level = "无抑郁"
-    elif 50 <= standard_score <= 60:
-        anxiety_level = "轻度抑郁"
-    elif 61 <= standard_score <= 70:
-        anxiety_level = "中度抑郁"
-    else:
-        anxiety_level = "重度抑郁"
-
-    finish_status = "未完成" if '0' in answer else "已完成"
+    emotion_json = None
+    comprehensive_score = None
+    comprehensive_json = None
+    comprehensive_result = None
+    if finish_status == "已完成":
+        comprehensive_payload = _build_sds_comprehensive_payload(
+            standard_score=standard_score,
+            emotion_data=emotion_data,
+            eeg_data=eeg_data,
+        )
+        emotion_json = comprehensive_payload["emotion_json"]
+        comprehensive_score = comprehensive_payload["comprehensive_score"]
+        comprehensive_json = comprehensive_payload["comprehensive_json"]
+        comprehensive_result = comprehensive_payload["comprehensive_result"]
 
     db.update(
-        "UPDATE test SET finish_time = ?, use_time = ?, progress_index = ?, status = ?, result = ?, choose = ?, score = ? WHERE id = ?",
-        [finish_time, total_time, progress_index, finish_status, anxiety_level, answer, standard_score, test_id]
+        """
+        UPDATE test
+        SET finish_time = ?, use_time = ?, progress_index = ?, status = ?,
+            result = ?, choose = ?, score = ?, emotion_data = ?,
+            comprehensive_score = ?, comprehensive_result = ?
+        WHERE id = ?
+        """,
+        [
+            finish_time,
+            total_time,
+            progress_index,
+            finish_status,
+            result_chinese,
+            answer,
+            standard_score,
+            emotion_json,
+            comprehensive_score,
+            comprehensive_json,
+            test_id,
+        ]
     )
+
+    flow_session_id = str(session.get("sds_flow_session_id") or "").strip()
+    if finish_status == "已完成" and flow_session_id:
+        try:
+            from new_features.scale_assessment.flow_service import attach_sds_completion
+
+            attach_sds_completion(
+                flow_session_id,
+                user_id=userinfo['id'],
+                sds_record_id=test_id,
+            )
+        except Exception as exc:
+            print(f"SDS 完成记录挂接 flow session 失败: {exc}")
+
     session.pop("test_id", None)
 
     return jsonify({
@@ -265,7 +353,11 @@ def SDS_submit():
         'test_id': test_id,
         'record_id': test_id,
         'score': standard_score,
-        'result': anxiety_level
+        'result': result_chinese,
+        'comprehensive_score': comprehensive_score,
+        'comprehensive_result': comprehensive_result,
+        'emotion_summary': (emotion_data or {}).get('summary', {}),
+        'eeg_summary': eeg_data or {}
     })
 
 @ts.route('/test/process', methods=['POST'])
@@ -738,150 +830,4 @@ def emotion_stop_stream():
         return jsonify({
             'success': False,
             'error': f'停止失败: {str(e)}'
-        }), 500
-
-@ts.route('/SDS/submit_with_emotion', methods=['POST'])
-def SDS_submit_with_emotion():
-    """提交SDS问卷（包含表情数据和综合评分）"""
-    try:
-        # 检查用户session
-        userinfo = session.get("userinfo")
-        if not userinfo:
-            return jsonify({
-                'success': False,
-                'error': '用户未登录'
-            }), 401
-        
-        # 检查测评session
-        test_id = session.get("test_id")
-        print(f"提交测评 - 用户: {userinfo.get('name', 'unknown')}, 测评ID: {test_id}")
-        if not test_id:
-            return jsonify({
-                'success': False,
-                'error': '请先开始测评，session中无test_id'
-            }), 400
-        
-        from utils.scoring_system import scoring_system
-        
-        # 获取前端发送的数据
-        data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': '无效的请求数据'
-            }), 400
-        answers = data.get('answers')
-        total_time = data.get('totalTime')
-        emotion_data = data.get('emotionData', {})  # 表情数据
-        finish_time = get_beijing_time()
-
-        # 转为字符串答案answer
-        answer = []
-        for i in range(1, 21):
-            key = str(i)
-            if key in answers:
-                answer.append(str(answers[key]['value']))
-            else:
-                answer.append('0')
-        answer = ''.join(answer)
-
-        # 计算SDS标准分
-        # 反向评分题题号（2,5,6,11,12,14,16,17,18,20）
-        reverse_questions = {2, 5, 6, 11, 12, 14, 16, 17, 18, 20}
-
-        total_score = 0
-        for i, score_str in enumerate(answer):
-            score = int(score_str)
-            question_num = i + 1
-            
-            if question_num in reverse_questions:
-                # 反向评分：4-原分数
-                score = 4 - score
-            
-            total_score += score
-
-        # 计算标准分
-        standard_score = int(total_score * 1.25)
-
-        # 使用新的综合评分系统
-        comprehensive_result = scoring_system.calculate_comprehensive_score(
-            sds_score=standard_score,
-            emotion_data=emotion_data
-        )
-        
-        # 获取综合评分结果
-        comprehensive_score = comprehensive_result['comprehensive_score']
-        depression_level = comprehensive_result['depression_level']
-        
-        # 转换depression_level到中文
-        level_mapping = {
-            'none': '无抑郁',
-            'mild': '轻度抑郁', 
-            'moderate': '中度抑郁',
-            'severe': '重度抑郁'
-        }
-        result_chinese = level_mapping.get(depression_level, '未知')
-
-        # 将表情数据和综合评分结果转换为JSON字符串存储
-        emotion_json = json.dumps(emotion_data) if emotion_data else None
-        comprehensive_json = json.dumps(comprehensive_result)
-
-        # 打印调试信息
-        print(f"准备更新数据库 - test_id: {test_id}")
-        print(f"  - 答案: {answer}")
-        print(f"  - 结果: {result_chinese}")
-        print(f"  - 分数: {standard_score}")
-        print(f"  - 综合分数: {comprehensive_score}")
-        print(f"  - 用时: {total_time}")
-        print(f"  - 完成时间（北京时间）: {finish_time}")
-        
-        # 更新数据库，包含所有评分数据
-        try:
-            affected_rows = db.update("""
-                UPDATE test 
-                SET choose=?, result=?, score=?, use_time=?, finish_time=?, status=?, 
-                    emotion_data=?, comprehensive_score=?, comprehensive_result=?
-                WHERE id=?
-            """, [answer, result_chinese, standard_score, total_time, finish_time, "已完成", 
-                  emotion_json, comprehensive_score, comprehensive_json, test_id])
-            
-            print(f"✓ 数据库更新完成 - test_id: {test_id}, 受影响行数: {affected_rows}")
-            
-            if affected_rows == 0:
-                print(f"✗ 警告：UPDATE 没有影响任何记录！test_id={test_id} 可能不存在")
-                # 检查记录是否存在
-                existing = db.fetch_one("SELECT * FROM test WHERE id=?", [test_id])
-                if existing:
-                    print(f"  记录存在，状态: {existing.get('status')}")
-                else:
-                    print(f"  记录不存在！")
-            else:
-                # 验证更新是否成功
-                updated_record = db.fetch_one("SELECT * FROM test WHERE id=?", [test_id])
-                if updated_record:
-                    print(f"✓ 验证成功 - 记录状态: {updated_record.get('status')}, 结果: {updated_record.get('result')}, 分数: {updated_record.get('score')}")
-                else:
-                    print(f"✗ 错误：更新后找不到记录！")
-                
-        except Exception as update_error:
-            print(f"✗ 数据库更新失败: {update_error}")
-            import traceback
-            traceback.print_exc()
-            raise
-
-        return jsonify({
-            'success': True,
-            'assessment_id': test_id,  # 添加测评ID
-            'result': result_chinese,
-            'sds_score': standard_score,
-            'comprehensive_score': comprehensive_score,
-            'comprehensive_result': comprehensive_result,
-            'emotion_summary': emotion_data.get('summary', {})
-        })
-
-    except Exception as e:
-        print(f"提交错误详情: {e}")
-        return jsonify({
-            'success': False,
-            'error': f'提交失败: {str(e)}'
         }), 500

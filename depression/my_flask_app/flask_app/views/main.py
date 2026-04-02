@@ -462,10 +462,11 @@ def submit_success():
     """提交成功页面"""
     # 从URL参数获取record_id
     record_id = request.args.get("record_id")
+    flow_session_id = request.args.get("flow_session_id", "")
     if not record_id:
         # 如果没有record_id，重定向到历史记录
         return redirect('/history')
-    return render_template('submit_success.html', record_id=record_id)
+    return render_template('submit_success.html', record_id=record_id, flow_session_id=flow_session_id)
 
 @mi.route('/api/report-details/<int:record_id>', methods=['GET'])
 def get_report_details(record_id):

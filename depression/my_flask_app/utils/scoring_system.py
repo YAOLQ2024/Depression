@@ -65,10 +65,14 @@ class ComprehensiveScoring:
         """
         if not emotion_data or not emotion_data.get('detections'):
             return {
-                'emotion_score': 0,
+                'available': False,
+                'emotion_score': 50.0,
                 'confidence_level': 'low',
-                'analysis': '无表情数据',
-                'details': {}
+                'analysis': '无表情数据，使用中性基线。',
+                'details': {
+                    'total_detections': 0,
+                    'dominant_emotion': 'unknown'
+                }
             }
         
         detections = emotion_data['detections']
@@ -98,6 +102,7 @@ class ComprehensiveScoring:
         analysis = self._generate_emotion_analysis(detections, summary, emotion_score)
         
         return {
+            'available': True,
             'emotion_score': round(emotion_score, 1),
             'confidence_level': confidence_level,
             'analysis': analysis,
@@ -259,7 +264,7 @@ class ComprehensiveScoring:
         
         return analysis
     
-    def calculate_eeg_score(self, emotion_score: float = None) -> Dict:
+    def calculate_eeg_score(self, emotion_score: float = None, eeg_data: Dict = None) -> Dict:
         """
         计算脑电分析评分（模拟版本）
         当前使用视觉情感AI分析的分数作为模拟数据
@@ -270,24 +275,81 @@ class ComprehensiveScoring:
         Returns:
             包含脑电评分详情的字典
         """
+        if eeg_data and isinstance(eeg_data, dict):
+            label = str(eeg_data.get('label') or '').strip().lower()
+            raw_score = eeg_data.get('score')
+            reason = str(eeg_data.get('reason') or '').strip().lower()
+            try:
+                raw_score = float(raw_score)
+            except (TypeError, ValueError):
+                raw_score = None
+
+            if label in {'positive', 'neutral', 'negative'} and raw_score is not None and reason != 'no_data':
+                raw_score = max(0.0, min(1.0, raw_score))
+                if label == 'negative':
+                    eeg_score = 50 + raw_score * 50
+                elif label == 'positive':
+                    eeg_score = 50 - raw_score * 50
+                else:
+                    eeg_score = 50.0
+
+                if raw_score >= 0.75:
+                    confidence_level = 'high'
+                elif raw_score >= 0.55:
+                    confidence_level = 'medium'
+                else:
+                    confidence_level = 'low'
+
+                label_map = {
+                    'positive': '积极',
+                    'neutral': '中性',
+                    'negative': '消极',
+                }
+                analysis = (
+                    f"脑电情绪分类结果为{label_map.get(label, label)}，"
+                    f"原始置信分数为{raw_score:.2f}，映射综合评分为{eeg_score:.1f}分。"
+                )
+                return {
+                    'available': True,
+                    'eeg_score': round(eeg_score, 1),
+                    'confidence_level': confidence_level,
+                    'analysis': analysis,
+                    'details': {
+                        'source': 'live_eeg_classification',
+                        'label': label,
+                        'raw_score': raw_score,
+                        'reason': eeg_data.get('reason'),
+                        'window_sec': eeg_data.get('window_sec'),
+                        'features': eeg_data.get('features') or {},
+                    }
+                }
+
         if emotion_score is not None:
             eeg_score = emotion_score  # 使用视觉情感分数作为模拟
             confidence_level = 'medium'  # 模拟数据，可信度中等
             analysis = f"脑电信号分析显示情绪状态与视觉表情识别结果一致，综合评分为{eeg_score:.1f}分。"
+            available = False
+            details = {
+                'source': 'simulated',
+                'note': '当前使用视觉情感AI分析结果作为模拟数据'
+            }
         else:
             # 如果没有提供分数，使用默认中性评分
             eeg_score = 50.0
             confidence_level = 'low'
             analysis = "脑电信号分析数据不足，使用默认中性评分。"
+            available = False
+            details = {
+                'source': 'simulated',
+                'note': '当前使用默认中性评分'
+            }
         
         return {
+            'available': available,
             'eeg_score': round(eeg_score, 1),
             'confidence_level': confidence_level,
             'analysis': analysis,
-            'details': {
-                'source': 'simulated',
-                'note': '当前使用视觉情感AI分析结果作为模拟数据'
-            }
+            'details': details
         }
     
     def calculate_comprehensive_score(self, sds_score: int, emotion_data: Dict, eeg_data: Dict = None) -> Dict:
@@ -308,7 +370,7 @@ class ComprehensiveScoring:
         
         # 2. 计算脑电评分（模拟版本：使用视觉情感分数）
         # 如果没有提供eeg_data，则使用emotion_score作为模拟
-        eeg_result = self.calculate_eeg_score(emotion_score=emotion_score)
+        eeg_result = self.calculate_eeg_score(emotion_score=emotion_score, eeg_data=eeg_data)
         eeg_score = eeg_result['eeg_score']
         
         # 3. 标准化SDS分数（原本0-80分，转换为0-100分）

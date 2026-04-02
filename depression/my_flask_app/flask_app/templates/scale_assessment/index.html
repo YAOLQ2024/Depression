@@ -13,36 +13,308 @@
     <section class="bg-white shadow-card rounded-card border border-white/70 overflow-hidden">
         <div class="p-6 sm:p-8 bg-gradient-to-r from-sky-50 via-white to-emerald-50 border-b border-gray-100">
             <p class="text-sm font-semibold tracking-[0.18em] text-[#165DFF] uppercase">Scale Assessment</p>
-            <h1 class="mt-3 text-3xl font-bold text-textPrimary">PHQ-9 / GAD-7 结构化量表筛查</h1>
+            <h1 class="mt-3 text-3xl font-bold text-textPrimary">统一量表筛查中心</h1>
             <p class="mt-3 max-w-3xl text-sm sm:text-base text-textSecondary leading-7">
-                当前先支持 PHQ-9 与 GAD-7。计分与分级完全由规则引擎完成，不依赖 LLM。后续结果可继续接入自动问诊与干预模块。
+                当前量表筛查统一纳入 `PHQ-9（患者健康问卷）`、`GAD-7（广泛性焦虑量表）` 与 `SDS（抑郁自评量表）`。
+                推荐流程会先创建一轮 `flow-session（量表流程会话）`，等你结束本轮后再统一触发 `risk-assessment（风险评估与安全建议模块）`。
             </p>
         </div>
 
-        <div class="p-6 sm:p-8 grid gap-5 lg:grid-cols-2">
-            {% for scale in scales %}
-            <a href="{{ url_for('scale_assessment.scale_form', scale_slug=scale.slug) }}"
-               class="group rounded-card border border-border bg-slate-50/70 hover:bg-white hover:border-[#165DFF]/30 hover:shadow-card-hover transition-all p-6 flex flex-col gap-4">
-                <div class="flex items-start justify-between gap-4">
+        <div class="p-6 sm:p-8 space-y-8">
+            <div id="scale-list-message" class="hidden"></div>
+
+            <section class="rounded-card border border-border bg-slate-50/70 p-6 sm:p-7">
+                <div class="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                     <div>
-                        <p class="text-xs uppercase tracking-[0.2em] text-textTertiary">{{ scale.short_name }}</p>
-                        <h2 class="mt-2 text-xl font-semibold text-textPrimary">{{ scale.name }}</h2>
+                        <p class="text-xs uppercase tracking-[0.18em] text-textTertiary">Recommended Flow</p>
+                        <h2 class="mt-2 text-2xl font-semibold text-textPrimary">标准筛查流程（推荐）</h2>
+                        <p class="mt-3 text-sm leading-7 text-textSecondary">
+                            推荐顺序为 `PHQ-9 -> GAD-7 -> SDS`。每份量表独立提交、独立保存，只有当你结束本轮流程时，才会统一生成当前风险评估。
+                        </p>
                     </div>
-                    <div class="w-12 h-12 rounded-2xl bg-[#165DFF]/10 text-[#165DFF] flex items-center justify-center text-xl group-hover:scale-105 transition-transform">
-                        <i class="fa-solid fa-clipboard-question"></i>
+                    <div class="flex flex-wrap gap-3">
+                        <span class="inline-flex items-center rounded-full bg-white border border-border px-4 py-2 text-sm text-textSecondary">
+                            <i class="fa-solid fa-list-check mr-2 text-[#165DFF]"></i>
+                            PHQ-9
+                        </span>
+                        <span class="inline-flex items-center rounded-full bg-white border border-border px-4 py-2 text-sm text-textSecondary">
+                            <i class="fa-solid fa-list-check mr-2 text-[#165DFF]"></i>
+                            GAD-7
+                        </span>
+                        <span class="inline-flex items-center rounded-full bg-white border border-border px-4 py-2 text-sm text-textSecondary">
+                            <i class="fa-solid fa-wave-square mr-2 text-[#165DFF]"></i>
+                            SDS + 多模态
+                        </span>
                     </div>
                 </div>
-                <p class="text-sm text-textSecondary leading-7">{{ scale.description }}</p>
-                <div class="flex items-center justify-between pt-2">
-                    <span class="text-xs text-textTertiary">规则计分 · 结构化输出</span>
-                    <span class="inline-flex items-center gap-2 text-sm font-medium text-[#165DFF]">
-                        开始填写
-                        <i class="fa-solid fa-arrow-right"></i>
-                    </span>
+
+                <div id="flow-session-shell" class="mt-6 rounded-card border border-dashed border-border bg-white/80 p-5">
+                    正在加载当前流程状态...
                 </div>
-            </a>
-            {% endfor %}
+            </section>
+
+            <section>
+                <div class="flex items-center justify-between gap-4 mb-5">
+                    <div>
+                        <h2 class="text-2xl font-semibold text-textPrimary">单项量表选择</h2>
+                        <p class="mt-2 text-sm text-textSecondary">
+                            如果你只想完成某一份量表，也可以单独开始。没有进行中的流程时，系统会为该量表创建一轮最小流程会话。
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    id="scale-list"
+                    data-list-url="{{ url_for('scale_assessment.scale_api_list') }}"
+                    data-flow-start-url="{{ url_for('scale_assessment.scale_flow_start') }}"
+                    data-flow-current-url="{{ url_for('scale_assessment.scale_flow_current') }}"
+                    class="grid gap-5 lg:grid-cols-2 xl:grid-cols-3"
+                >
+                    <div class="rounded-card border border-dashed border-border bg-slate-50/80 p-6 text-sm text-textSecondary">
+                        正在加载量表列表...
+                    </div>
+                </div>
+            </section>
         </div>
     </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/scale_assessment_api.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const {
+        requestJson,
+        renderStateMessage,
+        hideStateMessage,
+        escapeHtml,
+        buildScaleFormUrl,
+        buildSdsFormUrl,
+    } = window.ScaleAssessmentApi;
+    const listContainer = document.getElementById('scale-list');
+    const messageContainer = document.getElementById('scale-list-message');
+    const listUrl = listContainer.dataset.listUrl;
+    const flowStartUrl = listContainer.dataset.flowStartUrl;
+    const flowCurrentUrl = listContainer.dataset.flowCurrentUrl;
+    const flowShell = document.getElementById('flow-session-shell');
+
+    const manualSdsScale = {
+        scale_slug: 'sds',
+        scale_code: 'SDS',
+        scale_name: 'SDS 抑郁自评量表',
+        short_name: 'SDS',
+        description: '用于较完整地评估抑郁自评状态，当前旧版页面还可同步采集语音、表情与脑电等多模态信息。',
+        item_count: 20,
+        mode: 'self_report_multimodal',
+    };
+
+    function resolveScaleUrl(scaleSlug, flowSessionId = null) {
+        if (scaleSlug === 'sds') {
+            return buildSdsFormUrl(flowSessionId);
+        }
+        return buildScaleFormUrl(scaleSlug, flowSessionId);
+    }
+
+    async function startFlow(recommendedOrder) {
+        const payload = await requestJson(flowStartUrl, {
+            method: 'POST',
+            body: JSON.stringify({ recommended_order: recommendedOrder }),
+        });
+        return payload.data?.flow_session;
+    }
+
+    async function finalizeCurrentFlow(flowSessionId, triggerReason = 'manual_finalize') {
+        const payload = await requestJson(
+            `/api/v1/assessment/scale-screening/flow-session/${encodeURIComponent(flowSessionId)}/finalize-risk`,
+            {
+                method: 'POST',
+                body: JSON.stringify({ trigger_reason: triggerReason }),
+            }
+        );
+        return payload.data?.flow_session;
+    }
+
+    function renderFlowSession(flowSession) {
+        if (!flowSession) {
+            flowShell.innerHTML = `
+                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <div class="text-sm font-semibold text-textPrimary">当前没有进行中的量表流程</div>
+                        <div class="mt-2 text-sm text-textSecondary leading-7">
+                            建议从标准筛查流程开始，系统会在本轮结束时统一生成一次风险评估，不会在每份量表提交后重复计算。
+                        </div>
+                    </div>
+                    <button
+                        id="start-recommended-flow"
+                        type="button"
+                        class="px-5 py-3 rounded-btn bg-[#165DFF] text-white font-medium hover:bg-[#0E42D2] transition-colors shadow-sm"
+                    >
+                        开始推荐流程
+                    </button>
+                </div>
+            `;
+
+            document.getElementById('start-recommended-flow')?.addEventListener('click', async () => {
+                try {
+                    const nextFlow = await startFlow(['phq9', 'gad7', 'sds']);
+                    window.location.href = resolveScaleUrl(nextFlow.current_scale_slug, nextFlow.flow_session_id);
+                } catch (error) {
+                    renderStateMessage(messageContainer, 'error', error.message || '流程会话创建失败');
+                }
+            });
+            return;
+        }
+
+        const completed = flowSession.completed_scales || [];
+        const remaining = flowSession.remaining_scales || [];
+        const currentScaleSlug = flowSession.current_scale_slug || remaining[0] || null;
+        const riskGenerated = Boolean(flowSession.risk_assessment_generated);
+        flowShell.innerHTML = `
+            <div class="flex flex-col gap-5">
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                        <div class="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3 py-1 text-xs font-medium">
+                            <i class="fa-solid fa-clock-rotate-left mr-2"></i>
+                            已检测到进行中的量表流程
+                        </div>
+                        <div class="mt-3 text-sm text-textSecondary leading-7">
+                            当前已完成：${completed.length ? completed.map((item) => escapeHtml(item.toUpperCase())).join('、') : '暂无'}；
+                            剩余推荐：${remaining.length ? remaining.map((item) => escapeHtml(item.toUpperCase())).join('、') : '已完成全部推荐量表'}。
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        ${currentScaleSlug ? `
+                            <a href="${resolveScaleUrl(currentScaleSlug, flowSession.flow_session_id)}"
+                               class="px-5 py-3 rounded-btn bg-[#165DFF] text-white font-medium hover:bg-[#0E42D2] transition-colors shadow-sm">
+                                继续本轮筛查
+                            </a>
+                        ` : !riskGenerated ? `
+                            <button
+                                id="finalize-current-flow"
+                                type="button"
+                                class="px-5 py-3 rounded-btn bg-[#165DFF] text-white font-medium hover:bg-[#0E42D2] transition-colors shadow-sm"
+                            >
+                                生成完整风险评估
+                            </button>
+                        ` : ''}
+                        <a href="/scales/flow-result/${encodeURIComponent(flowSession.flow_session_id)}"
+                           class="px-5 py-3 rounded-btn border border-border text-textSecondary hover:bg-slate-50 transition-colors">
+                            查看本轮结果
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('finalize-current-flow')?.addEventListener('click', async () => {
+            try {
+                const updatedFlow = await finalizeCurrentFlow(flowSession.flow_session_id, 'manual_finalize');
+                window.location.href = `/scales/flow-result/${encodeURIComponent(updatedFlow.flow_session_id)}`;
+            } catch (error) {
+                renderStateMessage(messageContainer, 'error', error.message || '风险评估生成失败');
+            }
+        });
+    }
+
+    function renderScaleCards(items, currentFlow) {
+        const activeFlowHint = Boolean(currentFlow && currentFlow.flow_session_id);
+        listContainer.innerHTML = items.map((scale) => {
+            const standaloneHref = resolveScaleUrl(scale.scale_slug);
+            return `
+                <div class="group rounded-card border border-border bg-slate-50/70 hover:bg-white hover:border-[#165DFF]/30 hover:shadow-card-hover transition-all p-6 flex flex-col gap-4">
+                    <div class="flex items-start justify-between gap-4">
+                        <div>
+                            <p class="text-xs uppercase tracking-[0.2em] text-textTertiary">${escapeHtml(scale.short_name)}</p>
+                            <h2 class="mt-2 text-xl font-semibold text-textPrimary">${escapeHtml(scale.scale_name)}</h2>
+                        </div>
+                        <div class="w-12 h-12 rounded-2xl bg-[#165DFF]/10 text-[#165DFF] flex items-center justify-center text-xl group-hover:scale-105 transition-transform">
+                            <i class="fa-solid ${scale.scale_slug === 'sds' ? 'fa-wave-square' : 'fa-clipboard-question'}"></i>
+                        </div>
+                    </div>
+                    <p class="text-sm text-textSecondary leading-7">${escapeHtml(scale.description || '')}</p>
+                    <div class="rounded-2xl bg-white/80 border border-border px-4 py-3 text-xs text-textSecondary">
+                        ${scale.scale_slug === 'sds'
+                            ? '多模态测评页面保持原有交互样式，当前会自动兼容统一流程会话。'
+                            : '结构化量表页面保持当前 UI，提交后会继续沿用统一 API 链路。'}
+                    </div>
+                    <div class="mt-auto flex flex-col gap-3">
+                        <div class="text-xs text-textTertiary">共 ${escapeHtml(String(scale.item_count || 0))} 题</div>
+                        <div class="flex gap-3">
+                            ${activeFlowHint ? `
+                                <a href="${standaloneHref}"
+                                   class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-btn border border-border text-textSecondary hover:bg-slate-50 transition-colors">
+                                    直接填写
+                                </a>
+                            ` : `
+                                <button
+                                    type="button"
+                                    data-single-flow="${escapeHtml(scale.scale_slug)}"
+                                    class="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-btn bg-[#165DFF] text-white font-medium hover:bg-[#0E42D2] transition-colors shadow-sm"
+                                >
+                                    开始本量表
+                                </button>
+                            `}
+                        </div>
+                        ${activeFlowHint ? `
+                            <p class="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-2xl px-3 py-2">
+                                当前已有进行中的量表流程。如需统一风险评估，请优先继续上方流程。
+                            </p>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        if (!activeFlowHint) {
+            document.querySelectorAll('[data-single-flow]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const scaleSlug = button.dataset.singleFlow;
+                    try {
+                        const nextFlow = await startFlow([scaleSlug]);
+                        window.location.href = resolveScaleUrl(scaleSlug, nextFlow.flow_session_id);
+                    } catch (error) {
+                        renderStateMessage(messageContainer, 'error', error.message || '量表流程创建失败');
+                    }
+                });
+            });
+        }
+    }
+
+    try {
+        hideStateMessage(messageContainer);
+        const [currentFlowPayload, payload] = await Promise.all([
+            requestJson(flowCurrentUrl),
+            requestJson(listUrl),
+        ]);
+        const currentFlow = currentFlowPayload.data?.flow_session || null;
+        renderFlowSession(currentFlow);
+
+        const items = [...(payload.data?.items || []), manualSdsScale];
+
+        if (!items.length) {
+            listContainer.innerHTML = `
+                <div class="rounded-card border border-dashed border-border bg-slate-50/80 p-6 text-sm text-textSecondary">
+                    当前还没有可用量表。
+                </div>
+            `;
+            return;
+        }
+
+        renderScaleCards(items, currentFlow);
+    } catch (error) {
+        flowShell.innerHTML = `
+            <div class="rounded-card border border-dashed border-rose-200 bg-rose-50/80 p-6 text-sm text-rose-700">
+                当前流程状态加载失败，请稍后刷新页面重试。
+            </div>
+        `;
+        listContainer.innerHTML = `
+            <div class="rounded-card border border-dashed border-rose-200 bg-rose-50/80 p-6 text-sm text-rose-700">
+                量表列表加载失败，请稍后重试。
+            </div>
+        `;
+        renderStateMessage(messageContainer, 'error', error.message || '量表列表加载失败');
+    }
+});
+</script>
 {% endblock %}

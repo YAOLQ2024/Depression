@@ -100,10 +100,26 @@
                                 <div class="text-xs text-slate-600 mt-1">已分析</div>
                             </div>
                         </div>
+
+                        {% if flow_session_id %}
+                        <div id="sds-flow-summary" class="bg-emerald-50/60 border border-emerald-100 rounded-2xl p-4 text-left">
+                            <div class="flex items-start gap-3">
+                                <div class="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                                    <i class="fa-solid fa-arrow-right-arrow-left text-emerald-600"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="font-bold text-slate-800 mb-1 text-sm">当前已接入本轮量表流程</div>
+                                    <div id="sds-flow-summary-text" class="text-xs text-slate-600 leading-relaxed">
+                                        正在读取本轮流程状态...
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
                         
                         <!-- Action Buttons -->
-                        <div class="flex flex-col gap-3 pt-4">
-                            <a href="{{ url_for('main.comprehensive_detail', record_id=record_id) }}" 
+                        <div class="flex flex-col gap-3 pt-4" id="submit-success-actions">
+                            <a href="{{ url_for('main.comprehensive_detail', record_id=record_id) }}"
                                 class="w-full py-4 px-6 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-2 text-lg">
                                 <i class="fa-solid fa-file-medical"></i>
                                 <span>查看本次报告</span>
@@ -123,6 +139,7 @@
                                 </a>
                             </div>
                         </div>
+                        <div id="submit-success-flow-message" class="hidden"></div>
 
                         <!-- Info Tip -->
                         <div class="bg-blue-50/50 border border-blue-100 rounded-xl p-4 text-left">
@@ -144,4 +161,138 @@
         </div>
     </main>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{% if flow_session_id %}
+<script src="{{ url_for('static', filename='js/scale_assessment_api.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    const {
+        requestJson,
+        renderStateMessage,
+        hideStateMessage,
+        escapeHtml,
+        buildFlowResultUrl,
+        buildScaleFormUrl,
+        buildSdsFormUrl,
+    } = window.ScaleAssessmentApi;
+
+    const flowSessionId = {{ flow_session_id|tojson }};
+    const actionContainer = document.getElementById('submit-success-actions');
+    const messageContainer = document.getElementById('submit-success-flow-message');
+    const summaryText = document.getElementById('sds-flow-summary-text');
+
+    function resolveScaleUrl(scaleSlug, flowId = null) {
+        if (scaleSlug === 'sds') {
+            return buildSdsFormUrl(flowId);
+        }
+        return buildScaleFormUrl(scaleSlug, flowId);
+    }
+
+    async function finalizeCurrentFlow() {
+        hideStateMessage(messageContainer);
+        try {
+            await requestJson(
+                `/api/v1/assessment/scale-screening/flow-session/${encodeURIComponent(flowSessionId)}/finalize-risk`,
+                {
+                    method: 'POST',
+                    acceptedCodes: [1001],
+                    body: JSON.stringify({
+                        trigger_reason: 'manual_finalize_from_sds_success',
+                    }),
+                }
+            );
+            window.location.href = buildFlowResultUrl(flowSessionId);
+        } catch (error) {
+            renderStateMessage(messageContainer, 'error', error.message || '风险评估生成失败，请稍后重试');
+        }
+    }
+
+    try {
+        const payload = await requestJson(
+            `/api/v1/assessment/scale-screening/flow-session/${encodeURIComponent(flowSessionId)}`
+        );
+        const flowSession = payload.data?.flow_session;
+        if (!flowSession) {
+            throw new Error('当前流程状态不存在');
+        }
+
+        const completed = flowSession.completed_scales || [];
+        const remaining = flowSession.remaining_scales || [];
+        const nextScaleSlug = remaining[0] || null;
+        const recommendedCount = (flowSession.recommended_order || []).length;
+        const isSingleFlow = recommendedCount <= 1;
+        const isFlowComplete = remaining.length === 0;
+        summaryText.textContent = `当前已完成：${completed.length ? completed.map((item) => item.toUpperCase()).join('、') : '暂无'}；剩余推荐：${remaining.length ? remaining.map((item) => item.toUpperCase()).join('、') : '已完成本轮推荐量表'}。`;
+
+        const primaryAction = !isFlowComplete
+            ? `
+                <a href="${resolveScaleUrl(nextScaleSlug, flowSession.flow_session_id)}"
+                   class="py-3 px-4 glass-panel rounded-xl hover:shadow-md text-slate-700 hover:text-slate-900 font-semibold transition-all flex items-center justify-center gap-2 border border-slate-200">
+                    <i class="fa-solid fa-arrow-right"></i>
+                    <span>继续下一量表（推荐）</span>
+                </a>
+            `
+            : `
+                <button id="sds-finalize-risk" type="button"
+                    class="py-3 px-4 glass-panel rounded-xl hover:shadow-md text-slate-700 hover:text-slate-900 font-semibold transition-all flex items-center justify-center gap-2 border border-slate-200">
+                    <i class="fa-solid fa-shield-heart"></i>
+                    <span>${isSingleFlow ? '基于当前量表生成风险评估' : '生成完整风险评估'}</span>
+                </button>
+            `;
+
+        const secondaryAction = (!isFlowComplete && !isSingleFlow)
+            ? `
+                <button id="sds-end-flow" type="button"
+                    class="py-3 px-4 glass-panel rounded-xl hover:shadow-md text-slate-700 hover:text-slate-900 font-semibold transition-all flex items-center justify-center gap-2 border border-slate-200">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>结束本轮并生成当前风险评估</span>
+                </button>
+              `
+            : '';
+
+        const viewRiskAction = flowSession.risk_assessment_generated
+            ? `
+                <a href="${buildFlowResultUrl(flowSession.flow_session_id)}"
+                    class="py-3 px-4 glass-panel rounded-xl hover:shadow-md text-slate-700 hover:text-slate-900 font-semibold transition-all flex items-center justify-center gap-2 border border-slate-200">
+                    <i class="fa-solid fa-shield-halved"></i>
+                    <span>查看本轮风险结果</span>
+                </a>
+              `
+            : '';
+
+        actionContainer.innerHTML = `
+            <a href="{{ url_for('main.comprehensive_detail', record_id=record_id) }}"
+               class="w-full py-4 px-6 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white rounded-xl font-bold transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:-translate-y-0.5 flex items-center justify-center gap-2 text-lg">
+                <i class="fa-solid fa-file-medical"></i>
+                <span>查看本次报告</span>
+            </a>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                ${primaryAction}
+                ${secondaryAction || viewRiskAction}
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                ${secondaryAction && viewRiskAction ? viewRiskAction : ''}
+                <a href="{{ url_for('main.history') }}"
+                    class="py-3 px-4 glass-panel rounded-xl hover:shadow-md text-slate-700 hover:text-slate-900 font-semibold transition-all flex items-center justify-center gap-2 border border-slate-200">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>历史记录</span>
+                </a>
+                <a href="{{ url_for('scale_assessment.scale_home') }}"
+                    class="py-3 px-4 glass-panel rounded-xl hover:shadow-md text-slate-700 hover:text-slate-900 font-semibold transition-all flex items-center justify-center gap-2 border border-slate-200">
+                    <i class="fa-solid fa-notes-medical"></i>
+                    <span>返回量表筛查</span>
+                </a>
+            </div>
+        `;
+
+        document.getElementById('sds-finalize-risk')?.addEventListener('click', finalizeCurrentFlow);
+        document.getElementById('sds-end-flow')?.addEventListener('click', finalizeCurrentFlow);
+    } catch (error) {
+        summaryText.textContent = error.message || '当前流程状态加载失败，已保留普通完成页操作。';
+    }
+});
+</script>
+{% endif %}
 {% endblock %}
